@@ -1,0 +1,193 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function userDocExists() {
+      return isSignedIn() && exists(userPath());
+    }
+
+    function userDoc() {
+      return get(userPath()).data;
+    }
+
+    // Development bootstrap account. Use this only to create/repair the first
+    // admin profile, then you can remove this function/branch if desired.
+    function isBootstrapAdmin() {
+      return isSignedIn() && request.auth.token.email == 'admin@greentrash.vn';
+    }
+
+    function isAdmin() {
+      return userDocExists() && userDoc().role == 'ADMIN';
+    }
+
+    function isNhanVien() {
+      return userDocExists() && userDoc().role == 'NHAN_VIEN';
+    }
+
+    function isKhachHang() {
+      return userDocExists() && userDoc().role == 'KHACH_HANG';
+    }
+
+    function isActive() {
+      return userDocExists() && userDoc().trangThai == 'ACTIVE';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || (isActive() && isAdmin());
+      allow create: if isSignedIn() && isOwner(userId) && (
+        request.resource.data.role == 'KHACH_HANG' ||
+        (
+          isBootstrapAdmin() &&
+          request.resource.data.role == 'ADMIN' &&
+          request.resource.data.trangThai == 'ACTIVE'
+        )
+      );
+      allow update: if isSignedIn() && (
+        (isActive() && (isOwner(userId) || isAdmin())) ||
+        (
+          isOwner(userId) &&
+          isBootstrapAdmin() &&
+          request.resource.data.role == 'ADMIN' &&
+          request.resource.data.trangThai == 'ACTIVE'
+        )
+      );
+      allow delete: if false;
+    }
+
+    match /dia_chi/{diaChiId} {
+      allow read: if isActive() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isActive() && isKhachHang() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isActive() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isActive() && resource.data.userId == request.auth.uid;
+    }
+
+    match /loai_rac/{loaiRacId} {
+      allow read: if true;
+      allow create, update, delete: if isActive() && isAdmin();
+    }
+
+    match /dich_vu_gia_bieu/{bangGiaId} {
+      allow read: if true;
+      allow create, update, delete: if isActive() && isAdmin();
+    }
+
+    match /goi_thu_gom/{goiId} {
+      allow read: if true;
+      allow create, update, delete: if isActive() && isAdmin();
+    }
+
+    match /dang_ky_goi/{dangKyGoiId} {
+      allow read: if isActive() &&
+        (isAdmin() || resource.data.khachHangId == request.auth.uid);
+      allow create: if isActive() && isKhachHang() &&
+        request.resource.data.khachHangId == request.auth.uid;
+      allow update: if isActive() && isAdmin();
+      allow delete: if false;
+    }
+
+    match /don_thu_gom/{maDon} {
+      allow create: if isActive() && isKhachHang() &&
+        request.resource.data.khachHangId == request.auth.uid &&
+        request.resource.data.trangThai in ['CHO_XU_LY', 'CHO_PHAN_CONG'];
+
+      allow read: if isActive() && (
+        isAdmin() ||
+        resource.data.khachHangId == request.auth.uid ||
+        resource.data.nhanVienId == request.auth.uid
+      );
+
+      allow update: if isActive() && (
+        isAdmin() ||
+        (isKhachHang() && resource.data.khachHangId == request.auth.uid) ||
+        (
+          isNhanVien() &&
+          (
+            resource.data.nhanVienId == request.auth.uid ||
+            resource.data.nhanVienId == null
+          )
+        )
+      );
+
+      allow delete: if false;
+    }
+
+    match /bien_ban_thu_gom/{bienBanId} {
+      allow read: if isActive() && (
+        isAdmin() ||
+        exists(/databases/$(database)/documents/don_thu_gom/$(resource.data.maDon))
+      );
+      allow create, update: if isActive() && (isNhanVien() || isAdmin());
+      allow delete: if false;
+    }
+
+    match /thanh_toan/{thanhToanId} {
+      allow read: if isActive() &&
+        (isAdmin() || resource.data.khachHangId == request.auth.uid);
+      allow create: if isActive() &&
+        (isKhachHang() || isNhanVien() || isAdmin());
+      allow update: if isActive() && (isNhanVien() || isAdmin());
+      allow delete: if false;
+    }
+
+    match /doanh_thu_nhan_vien/{doanhThuId} {
+      allow read: if isActive() &&
+        (isAdmin() || resource.data.nhanVienId == request.auth.uid);
+      allow create, update: if isActive() && (isNhanVien() || isAdmin());
+      allow delete: if false;
+    }
+
+    match /khieu_nai/{khieuNaiId} {
+      allow read: if isActive() &&
+        (isAdmin() || resource.data.nguoiGuiId == request.auth.uid);
+      allow create: if isActive() &&
+        request.resource.data.nguoiGuiId == request.auth.uid;
+      allow update: if isActive() && isAdmin();
+      allow delete: if false;
+    }
+
+    match /thong_bao/{thongBaoId} {
+      allow read, update: if isActive() &&
+        (resource.data.nguoiNhanId == request.auth.uid || isAdmin());
+      allow create: if isActive() && (isNhanVien() || isAdmin());
+      allow delete: if false;
+    }
+
+    match /hoa_don/{hoaDonId} {
+      allow read: if isActive() &&
+        (isAdmin() || resource.data.khachHangId == request.auth.uid);
+      allow create, update: if isActive() && (isNhanVien() || isAdmin());
+      allow delete: if false;
+    }
+
+    match /lich_su_hoat_dong/{logId} {
+      allow read: if isActive() && isAdmin();
+      allow create: if isActive();
+      allow update, delete: if false;
+    }
+
+    match /thong_ke_bao_cao/{baoCaoId} {
+      allow read: if isActive() && isAdmin();
+      allow create, update: if isActive() && isAdmin();
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

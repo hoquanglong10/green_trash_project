@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "898442906799",
+    "project_id": "greentrashdb",
+    "storage_bucket": "greentrashdb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:898442906799:android:1cb05641af98ef910d185a",
+        "android_client_info": {
+          "package_name": "com.example.green_trash_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvf9y_R2lddCvgd_H6i7mxF54OEeOD_04"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
