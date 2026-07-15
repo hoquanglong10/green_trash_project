@@ -7,7 +7,7 @@ This screen is now the canonical visual baseline for GreenTrash:
 2. Full white `BrandWordmark` centered in the header, using `docs/logo/logo_mark.png` plus vector text for smooth rendering
 3. Light gray `#F3F4F6` page background
 4. White cards with subtle slate-opacity borders
-5. Green/blue hero composition adapted to pickup workflows
+5. Green-led greeting/status promo composition adapted to pickup workflows; blue is a small operational accent only, not a new visual language or a new gradient treatment
 6. Compact search/status area
 7. Promo/status card for current subscription
 8. Primary CTA to book pickup

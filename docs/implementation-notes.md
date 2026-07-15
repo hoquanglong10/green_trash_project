@@ -1,47 +1,39 @@
 # Implementation Notes
 
-## What was added
+## Current implementation
 
-- Root `AGENTS.md` for Codex behavior and UI constraints.
-- `docs/agent.md` with reusable prompts for future Codex work.
-- Design docs: `ui-style-guide.md`, `design-tokens.md`, `ui-guardrails.md`, `ui-audit-checklist.md`.
-- Screen specs for auth, customer home, staff home, admin dashboard, and order flow.
-- Reference image copied to `docs/references/auth-home-reference.png`.
+The application is a Flutter + Riverpod prototype with a coherent customer, staff, and admin UI. It currently uses `MockGreenTrashRepository` and an in-memory `OrderController`; it is not yet connected to Firebase at runtime.
 
-## What was updated in code
+Implemented mock behaviour:
 
-- `lib/core/theme/app_theme.dart`
-  - Added `AppSpacing`, `AppRadius`, and `AppSizes` token classes.
-  - Changed app theme to compact green-and-white mobile style.
-  - Standardized AppBar, cards, buttons, inputs, chips, and typography.
+- Demo login switches among customer, staff, and admin sessions.
+- A customer can create and cancel a pickup order, then view it in home and detail/tracking screens.
+- The mock dispatcher chooses an available staff member from the same area first, then uses lower current revenue as a tie-breaker.
+- The selected staff member can accept or reject the offer. A rejection advances the offer to another eligible staff member.
+- Staff can update the order through the supported collection statuses.
+- Admin has a manual assignment screen for exception handling, not as the normal dispatch path.
 
-- `lib/shared/widgets/app_widgets.dart`
-  - Added reusable `AppTextInput`, `PrimaryActionButton`, `SocialAuthButton`, `DividerLabel`, and `AppSearchBar`.
-  - Reworked `AppPage`, `HomeBrandHeader`, `MetricCard`, `OrderCard`, `StatusChip`, `OrderTimeline`, and `EmptyState` to use the design system.
+## Important backend boundary
 
-- `lib/features/auth/auth_gate.dart`
-  - Reworked Login, Sign Up, Forgot Password, and Verify OTP toward the provided reference style.
-  - Removed the previous large hero/gradient auth layout.
-  - Kept demo role selection and Riverpod session logic intact.
+Firebase dependencies, `firebase_options.dart`, and a Firestore schema contract are present, but the app does not call `Firebase.initializeApp`, Firebase Auth, or Cloud Firestore in its active flow. A hot restart resets all changes to mock seed data.
 
-- `lib/features/customer/customer_home_screen.dart`
-  - Reworked customer home to follow the reference Home structure: search, green promo card, package card, primary CTA, order list, notifications.
+The target direct-offer flow needs a deliberate Firestore migration before real persistence is added. The audited `DON_THU_GOM` contract has no proposal fields, while the mock `PickupOrder` contains `nhanVienDeXuatId` and `nhanVienTuChoiIds`. See `docs/Documentation/Firestore_Data_Audit.md` and `docs/screens/order-flow.md` before changing backend code.
 
-- `lib/features/customer/booking_screen.dart`
-  - Kept the booking flow intact.
-  - Fixed the default time-slot fallback to avoid an index error if the list has fewer than two items.
+## Architecture already in place
 
-## Checks
+- `lib/core/theme/app_theme.dart`: palette, spacing, radii, sizes, and Material theme.
+- `lib/shared/widgets/app_widgets.dart`: reusable logo, page shell, inputs, actions, cards, chips, timelines, and empty states.
+- `lib/features/customer/booking/`: booking screen split into small reusable widgets and calculator.
+- `lib/features/customer/order_detail/`: order detail screen split into lookup and presentation widgets.
+- `lib/providers/app_providers.dart`: Riverpod selectors plus the temporary in-memory order controller.
 
-Flutter/Dart tooling was not available in this environment, so `flutter analyze` and `flutter test` could not be executed here. Run locally:
+## Required validation
+
+Run these after any Dart/Flutter change:
 
 ```sh
-flutter pub get
 flutter analyze
 flutter test
-flutter run
 ```
 
-## Design rule for future screens
-
-Creative layout is allowed, but creative visual language is not allowed. New screens should reuse the tokens and shared widgets created here.
+For UI work, also follow `docs/ui-audit-checklist.md`. For data/backend work, verify collection names and fields against `lib/schema_contract.dart` and `docs/Documentation/Firestore_Data_Audit.md` before writing or deploying anything.

@@ -65,7 +65,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       panel: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(child: BrandLogo(stacked: true, logoSize: 104)),
+          const Center(child: BrandLogo(stacked: true, logoSize: 200)),
           const SizedBox(height: AppSpacing.xxl),
           AppTextInput(
             controller: _emailController,

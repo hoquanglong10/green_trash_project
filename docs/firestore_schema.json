@@ -1,0 +1,395 @@
+{
+  "metadata": {
+    "title": "GreenTrash Firestore Schema Contract",
+    "database": "greentrashdb",
+    "generatedAt": "2026-07-14",
+    "sourceOfTruth": [
+      "lib/schema_contract.dart",
+      "docs/Documentation/Firestore_Data_Audit.md"
+    ],
+    "collectionNaming": "Uppercase Vietnamese identifiers; collection names are case-sensitive.",
+    "runtimeStatus": "The Flutter app currently uses mock in-memory data. This file describes the audited Firestore contract, not data currently written by the app.",
+    "rulesWarning": "The current firestore.rules file uses an old lower_snake_case schema and must not be deployed until migrated."
+  },
+  "fieldTypes": [
+    "string",
+    "number",
+    "boolean",
+    "timestamp",
+    "geoPoint",
+    "stringArray"
+  ],
+  "enums": {
+    "userRoles": ["ADMIN", "CUSTOMER", "STAFF"],
+    "activeStates": ["ACTIVE", "LOCKED", "DELETED", "INACTIVE"],
+    "staffWorkStates": [
+      "SAN_SANG",
+      "DANG_RANH",
+      "DANG_THU_GOM",
+      "TAM_NGHI",
+      "NGHI_VIEC"
+    ],
+    "wasteGroups": ["HUU_CO", "VO_CO", "TAI_CHE"],
+    "wasteGroupDisplayVariants": ["Hữu cơ", "Vô cơ", "Tái chế"],
+    "orderStatuses": [
+      "CHO_XU_LY",
+      "CHO_NHAN",
+      "DA_NHAN",
+      "DANG_DEN",
+      "DA_DEN",
+      "DANG_CAN_RAC",
+      "HOAN_THANH",
+      "HUY"
+    ],
+    "timeSlots": [
+      "06:00-08:00",
+      "08:00-10:00",
+      "10:00-12:00",
+      "13:00-15:00",
+      "15:00-17:00",
+      "08-10"
+    ],
+    "feeTypes": ["GOI_THANG", "THEO_KG"],
+    "assignmentStatuses": ["CHO_NHAN", "DA_NHAN", "TU_CHOI", "HUY"],
+    "packageStatuses": [
+      "CHO_THANH_TOAN",
+      "CON_HIEU_LUC",
+      "HET_HAN",
+      "HUY",
+      "CON_HL"
+    ],
+    "paymentMethods": [
+      "TIEN_MAT",
+      "BANKING",
+      "CHUYEN_KHOAN",
+      "VI_DIEN_TU",
+      "GOI_THANG"
+    ],
+    "paymentStatuses": [
+      "CHO_THANH_TOAN",
+      "DA_THANH_TOAN",
+      "THAT_BAI",
+      "HOAN_TIEN",
+      "DA_TT"
+    ],
+    "reconciliationStatuses": ["CHO_DS", "DA_DS", "HUY"],
+    "complaintStatuses": [
+      "MOI",
+      "CHO_XU_LY",
+      "DANG_XU_LY",
+      "DA_PHAN_HOI",
+      "DONG"
+    ],
+    "readStatuses": ["CHUA_DOC", "DA_DOC"]
+  },
+  "knownDataVariants": [
+    "Some audited waste-group display values may have encoding damage; do not create new enum values from display text.",
+    "One audited DON_THU_GOM document uses khungGio = 08-10; the canonical format is 08:00-10:00.",
+    "A package may use CON_HL in place of CON_HIEU_LUC.",
+    "A payment may use DA_TT in place of DA_THANH_TOAN.",
+    "One payment stores GOI_THANG in phuongThuc although it is a fee type, not a normal payment method."
+  ],
+  "directOfferMigrationGap": {
+    "description": "The current mock order flow has nhanVienDeXuatId and nhanVienTuChoiIds, but those fields are not in the audited DON_THU_GOM contract.",
+    "affectedCollections": ["DON_THU_GOM", "PHAN_CONG_THU_GOM"],
+    "currentLimitation": "PHAN_CONG_THU_GOM.adminId is required, so it cannot represent a system-created staff offer without a schema migration.",
+    "requiredBeforeBackendImplementation": "Approve one persistence design, then update this JSON file, schema_contract.dart, repository mappers, indexes, Firestore Rules, Cloud Functions, and tests together."
+  },
+  "collections": [
+    {
+      "name": "VAI_TRO",
+      "documentIdField": "roleId",
+      "fields": {
+        "roleId": {"type": "string", "required": true},
+        "tenVaiTro": {"type": "string", "required": true},
+        "moTa": {"type": "string", "required": false},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "activeStates"}
+      }
+    },
+    {
+      "name": "NGUOI_DUNG",
+      "documentIdField": "userId",
+      "fields": {
+        "userId": {"type": "string", "required": true},
+        "uidFirebase": {"type": "string", "required": true},
+        "hoTen": {"type": "string", "required": true},
+        "soDienThoai": {"type": "string", "required": false},
+        "email": {"type": "string", "required": true},
+        "roleId": {"type": "string", "required": true, "allowedValues": "userRoles"},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "activeStates"},
+        "ngayTao": {"type": "timestamp", "required": true},
+        "ngayCapNhat": {"type": "timestamp", "required": false}
+      }
+    },
+    {
+      "name": "KHACH_HANG",
+      "documentIdField": "khachHangId",
+      "fields": {
+        "khachHangId": {"type": "string", "required": true},
+        "goiHienTaiId": {"type": "string", "required": false},
+        "diemUyTin": {"type": "number", "required": false},
+        "ghiChuCSKH": {"type": "string", "required": false}
+      }
+    },
+    {
+      "name": "NHAN_VIEN_THU_GOM",
+      "documentIdField": "nhanVienId",
+      "fields": {
+        "nhanVienId": {"type": "string", "required": true},
+        "maNhanVien": {"type": "string", "required": true},
+        "trangThaiLamViec": {"type": "string", "required": true, "allowedValues": "staffWorkStates"},
+        "gioBatDau": {"type": "string", "required": true},
+        "gioKetThuc": {"type": "string", "required": true},
+        "doanhThuHienTai": {"type": "number", "required": false},
+        "viTriHienTai": {"type": "string", "required": false}
+      }
+    },
+    {
+      "name": "ADMIN",
+      "documentIdField": "adminId",
+      "fields": {
+        "adminId": {"type": "string", "required": true},
+        "quyenQuanTri": {"type": "string", "required": true},
+        "capDoQuanTri": {"type": "number", "required": false}
+      }
+    },
+    {
+      "name": "DIA_CHI",
+      "documentIdField": "diaChiId",
+      "fields": {
+        "diaChiId": {"type": "string", "required": true},
+        "khachHangId": {"type": "string", "required": true},
+        "diaChiChiTiet": {"type": "string", "required": true},
+        "phuongXa": {"type": "string", "required": false},
+        "quanHuyen": {"type": "string", "required": false},
+        "tinhThanh": {"type": "string", "required": false},
+        "toaDoLat": {"type": "number", "required": false},
+        "toaDoLng": {"type": "number", "required": false},
+        "macDinh": {"type": "boolean", "required": true},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "activeStates"}
+      }
+    },
+    {
+      "name": "LOAI_RAC",
+      "documentIdField": "loaiRacId",
+      "fields": {
+        "loaiRacId": {"type": "string", "required": true},
+        "tenLoaiRac": {"type": "string", "required": true},
+        "nhomRac": {"type": "string", "required": true, "allowedValues": "wasteGroups"},
+        "moTa": {"type": "string", "required": false},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "activeStates"}
+      }
+    },
+    {
+      "name": "DICH_VU_GIA_BIEU",
+      "documentIdField": "bangGiaId",
+      "fields": {
+        "bangGiaId": {"type": "string", "required": true},
+        "loaiRacId": {"type": "string", "required": true},
+        "tenDichVu": {"type": "string", "required": true},
+        "donGiaKg": {"type": "number", "required": true},
+        "khuVuc": {"type": "string", "required": false},
+        "ngayHieuLuc": {"type": "timestamp", "required": true},
+        "ngayHetHieuLuc": {"type": "timestamp", "required": false},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "activeStates"}
+      }
+    },
+    {
+      "name": "GOI_THU_GOM",
+      "documentIdField": "goiId",
+      "fields": {
+        "goiId": {"type": "string", "required": true},
+        "tenGoi": {"type": "string", "required": true},
+        "hanMucKgThang": {"type": "number", "required": true},
+        "giaGoi": {"type": "number", "required": true},
+        "phiVuotGoi": {"type": "number", "required": true},
+        "moTa": {"type": "string", "required": false},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "activeStates"}
+      }
+    },
+    {
+      "name": "DANG_KY_GOI",
+      "documentIdField": "dangKyGoiId",
+      "fields": {
+        "dangKyGoiId": {"type": "string", "required": true},
+        "khachHangId": {"type": "string", "required": true},
+        "goiId": {"type": "string", "required": true},
+        "thangNam": {"type": "string", "required": true},
+        "soKgDaDung": {"type": "number", "required": true},
+        "soKgConLai": {"type": "number", "required": true},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "packageStatuses"},
+        "ngayDangKy": {"type": "timestamp", "required": true},
+        "ngayHetHan": {"type": "timestamp", "required": false}
+      }
+    },
+    {
+      "name": "DON_THU_GOM",
+      "documentIdField": "maDon",
+      "fields": {
+        "maDon": {"type": "string", "required": true},
+        "khachHangId": {"type": "string", "required": true},
+        "diaChiId": {"type": "string", "required": true},
+        "loaiRacId": {"type": "string", "required": true},
+        "nhanVienHienTaiId": {"type": "string", "required": false},
+        "khoiLuongDuKien": {"type": "number", "required": true},
+        "ngayThuGom": {"type": "timestamp", "required": true},
+        "khungGio": {"type": "string", "required": true, "allowedValues": "timeSlots"},
+        "gioChot": {"type": "timestamp", "required": false},
+        "hinhThucTinhPhi": {"type": "string", "required": true, "allowedValues": "feeTypes"},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "orderStatuses"},
+        "ghiChu": {"type": "string", "required": false},
+        "ngayTao": {"type": "timestamp", "required": true}
+      }
+    },
+    {
+      "name": "PHAN_CONG_THU_GOM",
+      "documentIdField": "phanCongId",
+      "fields": {
+        "phanCongId": {"type": "string", "required": true},
+        "maDon": {"type": "string", "required": true},
+        "nhanVienId": {"type": "string", "required": true},
+        "adminId": {"type": "string", "required": true},
+        "trangThaiPhanCong": {"type": "string", "required": true, "allowedValues": "assignmentStatuses"},
+        "thoiGianPhanCong": {"type": "timestamp", "required": true},
+        "lyDoTuChoi": {"type": "string", "required": false}
+      }
+    },
+    {
+      "name": "BIEN_BAN_THU_GOM",
+      "documentIdField": "bienBanId",
+      "fields": {
+        "bienBanId": {"type": "string", "required": true},
+        "maDon": {"type": "string", "required": true},
+        "nhanVienId": {"type": "string", "required": true},
+        "loaiRacThucTeId": {"type": "string", "required": true},
+        "khoiLuongThucTe": {"type": "number", "required": true},
+        "anhXacNhanUrl": {"type": "string", "required": false},
+        "phiPhaiTra": {"type": "number", "required": true},
+        "trangThaiThanhToan": {"type": "string", "required": true, "allowedValues": "paymentStatuses"},
+        "thoiGianLap": {"type": "timestamp", "required": true}
+      }
+    },
+    {
+      "name": "THANH_TOAN",
+      "documentIdField": "thanhToanId",
+      "fields": {
+        "thanhToanId": {"type": "string", "required": true},
+        "maDon": {"type": "string", "required": true},
+        "khachHangId": {"type": "string", "required": true},
+        "soTien": {"type": "number", "required": true},
+        "phuongThuc": {"type": "string", "required": true, "allowedValues": "paymentMethods"},
+        "maGiaoDichNgoai": {"type": "string", "required": false},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "paymentStatuses"},
+        "thoiGian": {"type": "timestamp", "required": true}
+      }
+    },
+    {
+      "name": "HOA_DON",
+      "documentIdField": "hoaDonId",
+      "fields": {
+        "hoaDonId": {"type": "string", "required": true},
+        "maDon": {"type": "string", "required": true},
+        "thanhToanId": {"type": "string", "required": false},
+        "soKgThucTe": {"type": "number", "required": true},
+        "donGia": {"type": "number", "required": true},
+        "tongTien": {"type": "number", "required": true},
+        "filePdfUrl": {"type": "string", "required": false},
+        "thoiGianTao": {"type": "timestamp", "required": true}
+      }
+    },
+    {
+      "name": "DOANH_THU_NHAN_VIEN",
+      "documentIdField": "doanhThuId",
+      "fields": {
+        "doanhThuId": {"type": "string", "required": true},
+        "nhanVienId": {"type": "string", "required": true},
+        "maDon": {"type": "string", "required": true},
+        "soTien": {"type": "number", "required": true},
+        "thoiGian": {"type": "timestamp", "required": true},
+        "trangThaiDoiSoat": {"type": "string", "required": true, "allowedValues": "reconciliationStatuses"}
+      }
+    },
+    {
+      "name": "KHIEU_NAI",
+      "documentIdField": "khieuNaiId",
+      "fields": {
+        "khieuNaiId": {"type": "string", "required": true},
+        "maDon": {"type": "string", "required": true},
+        "nguoiGuiId": {"type": "string", "required": true},
+        "noiDung": {"type": "string", "required": true},
+        "hinhAnhUrl": {"type": "string", "required": false},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "complaintStatuses"},
+        "phanHoi": {"type": "string", "required": false},
+        "nguoiXuLyId": {"type": "string", "required": false},
+        "thoiGianTao": {"type": "timestamp", "required": true},
+        "thoiGianXuLy": {"type": "timestamp", "required": false}
+      }
+    },
+    {
+      "name": "DANH_GIA",
+      "documentIdField": "danhGiaId",
+      "fields": {
+        "danhGiaId": {"type": "string", "required": true},
+        "maDon": {"type": "string", "required": true},
+        "khachHangId": {"type": "string", "required": true},
+        "nhanVienId": {"type": "string", "required": true},
+        "diemDichVu": {"type": "number", "required": true},
+        "diemNhanVien": {"type": "number", "required": true},
+        "noiDung": {"type": "string", "required": false},
+        "thoiGian": {"type": "timestamp", "required": true}
+      }
+    },
+    {
+      "name": "THONG_BAO",
+      "documentIdField": "thongBaoId",
+      "fields": {
+        "thongBaoId": {"type": "string", "required": true},
+        "nguoiNhanId": {"type": "string", "required": true},
+        "maDon": {"type": "string", "required": false},
+        "loaiThongBao": {"type": "string", "required": true},
+        "tieuDe": {"type": "string", "required": true},
+        "noiDung": {"type": "string", "required": true},
+        "trangThaiDoc": {"type": "string", "required": true, "allowedValues": "readStatuses"},
+        "thoiGian": {"type": "timestamp", "required": true}
+      }
+    },
+    {
+      "name": "LICH_SU_HOAT_DONG",
+      "documentIdField": "logId",
+      "fields": {
+        "logId": {"type": "string", "required": true},
+        "maDon": {"type": "string", "required": false},
+        "userId": {"type": "string", "required": true},
+        "hanhDong": {"type": "string", "required": true},
+        "thoiGian": {"type": "timestamp", "required": true},
+        "ghiChu": {"type": "string", "required": false}
+      }
+    },
+    {
+      "name": "THONG_KE_TONG_HOP",
+      "documentIdField": "thongKeId",
+      "fields": {
+        "thongKeId": {"type": "string", "required": true},
+        "ngayThongKe": {"type": "timestamp", "required": true},
+        "khuVuc": {"type": "string", "required": false},
+        "loaiRacId": {"type": "string", "required": false},
+        "tongSoDon": {"type": "number", "required": true},
+        "tongKg": {"type": "number", "required": true},
+        "tongDoanhThu": {"type": "number", "required": true},
+        "soKhieuNai": {"type": "number", "required": true}
+      }
+    },
+    {
+      "name": "THAM_SO_HE_THONG",
+      "documentIdField": "thamSoId",
+      "fields": {
+        "thamSoId": {"type": "string", "required": true},
+        "maThamSo": {"type": "string", "required": true},
+        "giaTri": {"type": "string", "required": true},
+        "moTa": {"type": "string", "required": false},
+        "ngayHieuLuc": {"type": "timestamp", "required": true},
+        "trangThai": {"type": "string", "required": true, "allowedValues": "activeStates"}
+      }
+    }
+  ]
+}

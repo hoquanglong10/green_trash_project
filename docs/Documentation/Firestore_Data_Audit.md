@@ -6,6 +6,14 @@ Project Firebase: `greentrashdb`
 
 Ket qua: quet duoc 38 documents trong 22 collections bang Firestore REST API. Database that su dung collection uppercase, khong phai lower_snake_case.
 
+## Pham Vi Va Trang Thai Tich Hop
+
+Day la audit read-only cua database that, khong phai mo ta cua mock app. Hien tai app chay `MockGreenTrashRepository`, chua khoi tao Firebase runtime va chua doc/ghi vao bat ky collection nao khi nguoi dung thao tac.
+
+`lib/schema_contract.dart` la ban code-level cua audit nay. Neu field/database thay doi, cap nhat audit va contract cung mot commit.
+
+`docs/firestore_schema.json` la ban JSON de doc nhanh duoc sinh tu contract nay. No khong thay the `schema_contract.dart`; hai file phai duoc cap nhat cung nhau khi schema thay doi.
+
 ## Collections Dang Co Du Lieu
 
 | Collection | Docs | Document ID field | Ghi chu UI |
@@ -63,3 +71,16 @@ Ket qua: quet duoc 38 documents trong 22 collections bang Firestore REST API. Da
 - Sample `THANH_TOAN.trangThai` dang la `DA_TT`, nen UI nen map label "Da thanh toan" cho ca `DA_TT` va `DA_THANH_TOAN`.
 - Sample `THANH_TOAN.phuongThuc` dang la `GOI_THANG`, trong khi tham so payment method la `TIEN_MAT`, `BANKING`, `VI_DIEN_TU`.
 - File `firestore.rules` hien tai trong workspace van la ban cu lower_snake_case. Khong nen deploy lai rules do truoc khi doi sang schema uppercase nay.
+
+## Khoang Cach Voi Direct-Offer Flow Da Chot
+
+Mock UI hien tai de xuat don truc tiep cho mot nhan vien qua `PickupOrder.nhanVienDeXuatId` va luu danh sach tu choi trong `nhanVienTuChoiIds`. Hai field nay **chua ton tai trong `DON_THU_GOM` da audit**.
+
+`PHAN_CONG_THU_GOM` da co `maDon`, `nhanVienId`, `trangThaiPhanCong`, `thoiGianPhanCong`, va `lyDoTuChoi`, nhung `adminId` dang la required. Vi vay no chua the bieu dien offer do he thong tu tao mot cach dung nghia.
+
+Truoc khi backend core duoc noi vao Firestore, can co migration da duyet:
+
+1. Dung `PHAN_CONG_THU_GOM` lam audit cho ca system offer va admin override; them `nguonPhanCong` va cho phep `adminId` null voi system offer; hoac
+2. Them cac proposal fields vao `DON_THU_GOM`, con `PHAN_CONG_THU_GOM` chi ghi assignment da chap nhan.
+
+Khong duoc sua UI de tu suy doan field moi. Sau khi chot, cap nhat `lib/schema_contract.dart`, repository mapper, Firestore Rules, indexes, test, va tai lieu order flow cung luc.

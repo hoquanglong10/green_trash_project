@@ -7,8 +7,8 @@ Operational version of the Customer Home style for staff:
 2. Light gray page background
 3. White work-shift status card
 4. Metric cards using green, blue, amber, and purple accents only
-5. Assigned/new order list
+5. New order offers that belong to the signed-in staff member, followed by that staff member's accepted orders
 6. Compact order cards and status chips
 
 ## Rules
-Keep it fast to scan, compact, and action-oriented. Do not use admin-dashboard-heavy visuals. Staff screens must feel like the same app as Customer Home, with blue reserved for active pickup progress and amber for pending/attention states.
+Keep it fast to scan, compact, and action-oriented. New offers expose only the necessary pickup information and explicit `Nhận đơn` / `Từ chối` actions. A rejection moves the offer onward through the dispatcher; staff must not see or claim every pending order. Do not use admin-dashboard-heavy visuals. Staff screens must feel like the same app as Customer Home, with blue reserved for active pickup progress and amber for pending/attention states.

@@ -4,11 +4,24 @@ Nguon doc: `GreenTrash mainn.docx` va `GreenTrashDoc.pdf`.
 
 Muc dich file nay: ghi nho yeu cau chinh cua do an GreenTrash de bam khi thiet ke/cai dat Flutter app.
 
+## 0. Quyet Dinh Hien Tai Va Thu Tu Uu Tien
+
+File nay tong hop yeu cau nghiep vu tu docx/PDF goc. Khi co mau thuan giua tai lieu goc, mock UI, va Firebase, ap dung thu tu sau:
+
+1. `docs/Documentation/Firestore_Data_Audit.md` va `lib/schema_contract.dart` cho ten collection/field dang co trong Firestore.
+2. `docs/screens/order-flow.md` cho flow dat don - nhan don da duoc nhom chot.
+3. `docs/design-tokens.md`, `docs/ui-style-guide.md`, va `AGENTS.md` cho UI.
+4. Docx/PDF goc cho quy dinh nghiep vu con lai.
+
+Trang thai hien tai cua repo la UI + mock state, chua co Firebase runtime. Dat don, de xuat nhan vien, nhan/tu choi, va cap nhat trang thai hien chi song trong bo nho va se reset khi hot restart.
+
+Quyet dinh flow chinh cua san pham: khach dat don -> he thong de xuat nhan vien gan/phu hop -> nhan vien nhan hoac tu choi -> he thong de xuat nguoi ke tiep. Admin chi can thiep khi khong co nguoi phu hop, can dieu phoi lai, hoac co su co. Admin khong phan cong thu cong tung don trong flow binh thuong.
+
 ## 1. Tong Quan
 
 GreenTrash la he thong/app thu gom rac tai che, ho tro khach hang dat lich thu gom, nhan vien thu gom xu ly don, va admin/CSKH quan ly van hanh.
 
-Cong nghe dinh huong trong tai lieu:
+Kien truc muc tieu trong tai lieu:
 
 - Flutter cho app mobile khach hang va nhan vien.
 - Flutter Web/Admin app cho admin, CSKH, van hanh, tai chinh.
@@ -17,6 +30,8 @@ Cong nghe dinh huong trong tai lieu:
 - Cloud Storage cho anh bang chung thu gom va hoa don PDF.
 - Cloud Functions cho phan cong, kiem tra gio lam viec, tinh phi, cap nhat han muc/doanh thu/thong ke.
 - Firebase Cloud Messaging cho thong bao realtime.
+
+Luu y: day la kien truc muc tieu. Firebase packages va configuration da co trong repo, nhung `main.dart` chua khoi tao Firebase va repository dang la mock.
 
 ## 2. Vai Tro
 
@@ -34,7 +49,7 @@ Khach hang:
 
 Nhan vien thu gom:
 
-- Dang nhap, xem don duoc phan cong.
+- Dang nhap, xem offer don moi cua minh va don da nhan.
 - Nhan/tu choi don.
 - Chot gio den du kien.
 - Cap nhat trang thai di chuyen/tien trinh.
@@ -47,7 +62,7 @@ Nhan vien thu gom:
 Admin/CSKH:
 
 - Quan ly tai khoan khach hang/nhan vien, khoa/mo tai khoan.
-- Quan ly lich dat va phan cong nhan vien.
+- Theo doi lich dat, cac don khong tim duoc nhan vien, va can thiep dieu phoi/phan cong lai khi can.
 - Quan ly phan loai rac, dich vu, bang gia, goi thang, tham so he thong.
 - Quan ly khieu nai, phan hoi va dong khieu nai.
 - Xem dashboard thong ke: don, kg rac, doanh thu, khieu nai, khu vuc, loai rac.
@@ -170,22 +185,21 @@ BM03 - Phieu doi diem/nhan qua trong tai lieu, nhung noi dung thuc te gan voi go
 
 ## 6. Luong Chinh
 
-Dat lich thu gom:
+Dat lich thu gom va de xuat nhan vien:
 
 1. Khach hang chon dich vu/bang gia, dia chi, loai rac, khoi luong du kien, ngay, khung gio, goi thang hoac tra theo kg.
 2. He thong kiem tra dang nhap, thong tin bat buoc, loai rac, goi/thanh toan, gio lam viec va ca phu hop.
-3. He thong tao don, sinh ma don, luu lich su.
-4. Neu du dieu kien: don sang Cho phan cong/Cho nhan va gui thong bao.
-5. Neu ngoai gio/het ca: don sang Cho xu ly va thong bao cho khach hang.
+3. He thong tao don, sinh ma don, luu lich su; don o `CHO_XU_LY` trong luc tim nguoi nhan.
+4. Dispatcher chon nhan vien dang san sang, uu tien khu vuc gan/phu hop, va gui thong bao de xuat don moi cho mot nhan vien tai mot thoi diem.
+5. Neu khong co nguoi phu hop, don giu `CHO_XU_LY` va hien trong hang doi can admin/CSKH can thiep. Khach hang duoc thong bao trang thai cho xu ly.
 
-Nhan don thu gom:
+Nhan hoac tu choi don thu gom:
 
-1. Nhan vien mo don duoc phan cong.
-2. He thong kiem tra dung nhan vien, dung gio 06:00-17:00, don con Cho nhan, chua bi huy.
-3. Nhan vien bam Nhan don hoac Tu choi.
-4. Neu nhan: nhan vien chot gio den du kien trong khung gio khach chon.
-5. He thong cap nhat Da nhan/Da chot gio, luu lich su, thong bao khach hang.
-6. Neu tu choi: bat buoc nhap ly do, don chuyen Tu choi/Cho phan cong lai.
+1. Nhan vien chi mo duoc offer cua minh va xem thong tin can thiet de quyet dinh.
+2. He thong kiem tra nhan vien dang trong gio lam viec 06:00-17:00, offer con hieu luc, va don chua bi huy/da nhan boi nguoi khac.
+3. Nhan vien bam Nhan don hoac Tu choi; tu choi phai co ly do khi dua vao backend that.
+4. Neu nhan: he thong gan `nhanVienHienTaiId`, chuyen don sang `DA_NHAN`, luu lich su, va thong bao khach hang. Nhan vien co the chot gio den du kien trong khung gio khach chon.
+5. Neu tu choi: he thong luu audit tu choi va de xuat offer cho nhan vien phu hop ke tiep. Chi khi da het lua chon moi dua don ve hang doi can admin can thiep.
 
 Cap nhat tien trinh:
 
@@ -218,22 +232,18 @@ Huy don/khieu nai:
 
 ## 7. Trang Thai
 
-Trang thai DonThuGom theo text va statechart:
+Trang thai `DON_THU_GOM` da duoc audit va dang duoc UI support:
 
-- Moi tao.
-- Cho xu ly.
-- Cho phan cong.
-- Cho nhan.
-- Da nhan.
-- Da chot gio.
-- Sap di thu.
-- Dang den.
-- Da den noi.
-- Dang kiem tra/can rac.
-- Da lay rac thanh cong.
-- Cho thanh toan.
-- Hoan thanh.
-- Huy/Tu choi.
+- `CHO_XU_LY`: don moi, he thong dang tim/luan chuyen offer cho nhan vien; day la hang doi exception neu khong con nguoi phu hop.
+- `CHO_NHAN`: chi dung khi admin/CSKH chon nhan vien trong truong hop override.
+- `DA_NHAN`: nhan vien da chap nhan va tro thanh `nhanVienHienTaiId`.
+- `DANG_DEN`: nhan vien dang di den diem thu gom.
+- `DA_DEN`: nhan vien da den diem thu gom.
+- `DANG_CAN_RAC`: dang kiem tra, phan loai, va can rac.
+- `HOAN_THANH`: da xac nhan ket qua thu gom/theo luong thanh toan.
+- `HUY`: don bi huy; phai co ly do trong backend that.
+
+`gioChot` la timestamp, khong phai mot order status rieng. Cac nhan nhu "sap di thu" hay "cho thanh toan" co the la derived UI/payment state, nhung khong duoc tu y them vao enum `DON_THU_GOM` neu chua co migration.
 
 Trang thai goi:
 
@@ -268,32 +278,17 @@ Trang thai tai khoan:
 - Khoa/an.
 - Deleted/locked theo bang chi tiet.
 
-## 8. Du Lieu/Collections De Xuat
+## 8. Du Lieu/Collections Firestore Dang Co
 
-Tai lieu thiet ke du lieu theo huong 3NF. Khi dua sang Firestore co the map thanh collections:
+Firestore that da duoc audit dung ten collection uppercase va phan biet hoa thuong. Khong dung cac ten lower_snake_case trong `firestore.rules` cu.
 
-- roles tu VAI_TRO.
-- users tu NGUOI_DUNG.
-- customers tu KHACH_HANG.
-- collectionStaff tu NHAN_VIEN_THU_GOM.
-- admins tu ADMIN.
-- addresses tu DIA_CHI.
-- wasteTypes tu LOAI_RAC.
-- priceTables/services tu DICH_VU_GIA_BIEU.
-- monthlyPackages tu GOI_THU_GOM.
-- packageSubscriptions tu DANG_KY_GOI.
-- pickupOrders tu DON_THU_GOM.
-- staffAssignments tu PHAN_CONG_THU_GOM.
-- collectionConfirmations tu BIEN_BAN_THU_GOM.
-- payments tu THANH_TOAN.
-- invoices tu HOA_DON.
-- employeeRevenues tu DOANH_THU_NHAN_VIEN.
-- complaints tu KHIEU_NAI.
-- reviews tu DANH_GIA.
-- notifications tu THONG_BAO.
-- activityLogs tu LICH_SU_HOAT_DONG.
-- aggregateStats tu THONG_KE_TONG_HOP.
-- systemParameters tu THAM_SO_HE_THONG.
+- `VAI_TRO`, `NGUOI_DUNG`, `KHACH_HANG`, `NHAN_VIEN_THU_GOM`, `ADMIN`.
+- `DIA_CHI`, `LOAI_RAC`, `DICH_VU_GIA_BIEU`, `GOI_THU_GOM`, `DANG_KY_GOI`.
+- `DON_THU_GOM`, `PHAN_CONG_THU_GOM`, `BIEN_BAN_THU_GOM`.
+- `THANH_TOAN`, `HOA_DON`, `DOANH_THU_NHAN_VIEN`.
+- `KHIEU_NAI`, `DANH_GIA`, `THONG_BAO`, `LICH_SU_HOAT_DONG`, `THONG_KE_TONG_HOP`, `THAM_SO_HE_THONG`.
+
+Chi tiet required/optional field va enum nam trong `lib/schema_contract.dart`; ket qua doc data mau nam trong `Firestore_Data_Audit.md`.
 
 Field cot loi:
 
@@ -314,6 +309,8 @@ Field cot loi:
 - ActivityLog: logId, maDon, userId, hanhDong, thoiGian, ghiChu.
 - AggregateStat: thongKeId, ngayThongKe, khuVuc, loaiRacId, tongSoDon, tongKg, tongDoanhThu, soKhieuNai.
 - SystemParameter: thamSoId, maThamSo, giaTri, moTa, ngayHieuLuc, trangThai.
+
+Khoang cach can xu ly truoc khi gan backend that: mock `PickupOrder` co `nhanVienDeXuatId` va `nhanVienTuChoiIds` de phuc vu direct-offer flow, nhung hai field nay chua co trong contract Firestore da audit. `PHAN_CONG_THU_GOM` hien cung yeu cau `adminId`. Nhom phai chon migration schema ro rang theo `docs/screens/order-flow.md`, sau do cap nhat contract, mapper, rules, va tests dong thoi.
 
 ## 9. Tham So He Thong Mac Dinh
 
@@ -344,7 +341,7 @@ Nhan vien:
 
 - Dang nhap.
 - Trang chu nhan vien.
-- Danh sach don duoc phan cong.
+- Danh sach offer don moi cua minh va don da nhan.
 - Chi tiet don nhan.
 - Nhan/Tu choi/Chot gio.
 - Cap nhat tien trinh.
@@ -356,7 +353,7 @@ Admin/CSKH:
 
 - Dang nhap web.
 - Dashboard thong ke.
-- Quan ly lich dat va phan cong.
+- Quan ly lich dat, don exception, va phan cong/phan cong lai khi can thiep.
 - Quan ly phan loai - gia bieu.
 - Quan ly goi thang/tham so.
 - Quan ly tai khoan khach hang/nhan vien.
@@ -385,12 +382,12 @@ Khach hang wireframe:
 - Login/Dang ky: logo, email/SDT, mat khau, dang nhap, tao tai khoan, quen mat khau/xac thuc danh tinh.
 - Trang chu: goi hien tai 126 kg/thang, da dung/con lai, nut dat lich, don dang theo doi, thong bao moi.
 - Dat lich: dia chi, loai rac, kg du kien, ngay, khung gio, ghi chu, xac nhan dat lich.
-- Chi tiet don: ma don, trang thai hien tai, timeline Da nhan -> Sap di thu -> Dang den -> Da den -> Hoan thanh, thong tin don, huy don, khieu nai, xac nhan/thanh toan.
+- Chi tiet don: ma don, trang thai hien tai, timeline Cho xu ly -> Da nhan -> Dang den -> Da den -> Dang can rac -> Hoan thanh, thong tin don, huy don, khieu nai, xac nhan/thanh toan.
 - Goi thang & thanh toan: goi 126 kg/thang, han hieu luc, da dung, dang ky/gia han, thanh toan theo kg thuc te, lich su gan day.
 
 Nhan vien wireframe:
 
-- Trang chu: ca lam viec 06:00-17:00, don moi duoc phan cong, nut nhan/tu choi, don hom nay.
+- Trang chu: ca lam viec 06:00-17:00, offer don moi cua minh, nut nhan/tu choi, don da nhan hom nay.
 - Chi tiet don: ma don, thong tin khach, dia chi, loai rac, kg du kien, khung gio, chot gio, cap nhat trang thai, ban do/goi khach, huy don va nhap ly do.
 - Cap nhat tien trinh: chon trang thai don, vi tri gan nhat/GPS, luu trang thai va thong bao khach hang.
 - Xac nhan thu gom: loai rac thuc te, kg thuc te, khung chup/upload anh, tu dong tinh phi, ghi nhan thu tien tai cho, hoan thanh don.
@@ -399,7 +396,7 @@ Nhan vien wireframe:
 Admin wireframe:
 
 - Dashboard: tong don hom nay, kg rac thu gom, doanh thu, bieu do so kg theo ngay, bo loc thoi gian/khu vuc/loai rac/trang thai.
-- Quan ly lich dat & phan cong: tim kiem, loc trang thai, bang don, phan cong tu dong, panel thao tac.
+- Quan ly lich dat & exception: tim kiem, loc trang thai, bang don khong co nguoi nhan/can dieu phoi lai, panel override thu cong khi can.
 - Quan ly phan loai/gia/goi: them loai rac, them goi, bang gia theo loai rac, goi 126 kg/thang, phi vuot goi, ngay hieu luc.
 - Tai khoan & khieu nai: danh sach tai khoan, khoa/mo, danh sach khieu nai, phan hoi.
 
@@ -407,7 +404,7 @@ Admin wireframe:
 
 - Moi tai khoan gan UID Firebase duy nhat.
 - Khach hang chi sua ho so va don cua minh khi con hop le.
-- Nhan vien chi xem/nhan/cap nhat don duoc phan cong.
+- Nhan vien chi xem offer cua minh, nhan/tu choi offer cua minh, va cap nhat don ma minh da nhan.
 - Admin quan ly bang gia, goi, tham so, tai khoan, thong ke.
 - CSKH/Admin xu ly khieu nai.
 - Thanh toan khong luu thong tin the/mat khau ngan hang nhay cam.
@@ -415,15 +412,18 @@ Admin wireframe:
 
 ## 13. Ghi Chu Trien Khai MVP
 
-Vi repo hien tai la Flutter moi tao, nen nen di theo thu tu:
+Nhung buoc da co trong repo:
 
-1. Sua app mac dinh thanh GreenTrash shell va theme.
-2. Tao mock data/model/enums theo tai lieu truoc khi ket noi Firebase.
-3. Lam navigation 3 role: Khach hang, Nhan vien, Admin.
-4. Lam luong khach hang dat lich va theo doi don.
-5. Lam luong nhan vien nhan don, cap nhat tien trinh, xac nhan thu gom.
-6. Lam admin dashboard, bang phan cong, bang gia/goi, khieu nai.
-7. Sau khi UI/logic demo on dinh moi gan Firebase Auth/Firestore/Storage/FCM.
+1. GreenTrash shell, design system, logo, va navigation 3 role.
+2. Mock data/model/enums cho cac man hinh chinh.
+3. Customer booking, theo doi don, staff offer/accept/reject, cap nhat tien trinh, va admin exception assignment o muc mock.
+
+Thu tu tiep theo:
+
+4. Chot migration cho direct-offer flow va sua Firestore Rules sang schema uppercase.
+5. Khoi tao Firebase, Firebase Auth, va Firestore repository/mappers.
+6. Chuyen order flow sang realtime transaction/stream; ghi `THONG_BAO` va `LICH_SU_HOAT_DONG` cho moi transition.
+7. Gan Cloud Storage cho anh bang chung, sau do mo rong payment, invoice, doanh thu, package, complaint, va FCM.
 
 Quy tac uu tien khi co mau thuan:
 

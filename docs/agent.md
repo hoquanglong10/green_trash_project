@@ -1,6 +1,19 @@
-# Codex Operating Guide for GreenTrash UI
+# AI Operating Guide for GreenTrash
 
-Use this file as the user-facing runbook for future Codex tasks.
+Use `docs/AI_COLLABORATOR_BRIEF.md` as the complete project brief for any AI-assisted task. This file keeps short prompt templates for focused UI work.
+
+## Reading order
+
+For UI-only work, read `AGENTS.md`, the design documents, the relevant screen spec, and `docs/references/auth-home-reference.png`.
+
+For data, business-flow, or Firebase work, read these before editing:
+
+1. `docs/Documentation/GreenTrash_Project_Context.md`
+2. `docs/Documentation/Firestore_Data_Audit.md`
+3. `lib/schema_contract.dart`
+4. `docs/screens/order-flow.md`
+
+The audited uppercase Firestore schema is authoritative. The current app flow is mocked and must not be described as a live backend.
 
 ## Default prompt for UI work
 
