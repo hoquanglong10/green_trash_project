@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
+import '../reference_data/application/reference_data_providers.dart';
 import '../../models/app_models.dart';
 import '../../providers/app_providers.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../orders/presentation/order_history_screen.dart';
+import 'order/staff_order_flow.dart';
 import 'staff_order_screen.dart';
 
 class StaffHomeScreen extends ConsumerWidget {
@@ -19,6 +22,7 @@ class StaffHomeScreen extends ConsumerWidget {
     }
     final offers = ref.watch(staffOfferOrdersProvider);
     final orders = ref.watch(staffOrdersProvider);
+    final history = ref.watch(staffOrderHistoryProvider);
     final staffProfile = _findStaff(
       ref.watch(staffProfilesProvider),
       user.userId,
@@ -35,8 +39,10 @@ class StaffHomeScreen extends ConsumerWidget {
       actions: [
         IconButton(
           tooltip: 'Đăng xuất',
-          onPressed: () =>
-              ref.read(currentSessionProvider.notifier).state = null,
+          onPressed: () async {
+            await ref.read(firebaseAuthenticationServiceProvider).signOut();
+            ref.read(currentSessionProvider.notifier).state = null;
+          },
           icon: const Icon(Icons.logout),
         ),
       ],
@@ -62,6 +68,13 @@ class StaffHomeScreen extends ConsumerWidget {
                         profile: staffProfile,
                         offerCount: offers.length,
                         activeCount: orders.length,
+                        onToggleAvailability: staffProfile == null
+                            ? null
+                            : () => _toggleAvailability(
+                                context,
+                                ref,
+                                staffProfile,
+                              ),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.lg),
@@ -81,6 +94,13 @@ class StaffHomeScreen extends ConsumerWidget {
                   addresses: addresses,
                   wastes: wastes,
                 ),
+                const SizedBox(height: AppSpacing.sectionGap),
+                _OrderHistoryList(
+                  orders: history,
+                  addresses: addresses,
+                  wastes: wastes,
+                  onViewHistory: () => _openHistory(context),
+                ),
               ],
             );
           }
@@ -92,6 +112,9 @@ class StaffHomeScreen extends ConsumerWidget {
                 profile: staffProfile,
                 offerCount: offers.length,
                 activeCount: orders.length,
+                onToggleAvailability: staffProfile == null
+                    ? null
+                    : () => _toggleAvailability(context, ref, staffProfile),
               ),
               const SizedBox(height: AppSpacing.sectionGap),
               _StaffOfferPanel(
@@ -106,11 +129,75 @@ class StaffHomeScreen extends ConsumerWidget {
                 addresses: addresses,
                 wastes: wastes,
               ),
+              const SizedBox(height: AppSpacing.sectionGap),
+              _OrderHistoryList(
+                orders: history,
+                addresses: addresses,
+                wastes: wastes,
+                onViewHistory: () => _openHistory(context),
+              ),
             ],
           );
         },
       ),
     );
+  }
+
+  void _openHistory(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            const OrderHistoryScreen(audience: OrderHistoryAudience.staff),
+      ),
+    );
+  }
+
+  Future<void> _toggleAvailability(
+    BuildContext context,
+    WidgetRef ref,
+    StaffProfile profile,
+  ) async {
+    if (profile.trangThaiLamViec == 'DANG_THU_GOM') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hãy hoàn tất hoặc hủy công việc đang xử lý trước.'),
+        ),
+      );
+      return;
+    }
+
+    final nextStatus = profile.trangThaiLamViec == 'SAN_SANG'
+        ? 'TAM_NGHI'
+        : 'SAN_SANG';
+    if (ref.read(firebaseEnabledProvider)) {
+      try {
+        await ref
+            .read(referenceDataRepositoryProvider)
+            .updateStaffAvailability(
+              staffId: profile.nhanVienId,
+              status: nextStatus,
+            );
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Khong the cap nhat trang thai lam viec.'),
+            ),
+          );
+        }
+      }
+      return;
+    }
+    ref
+        .read(staffProfileControllerProvider.notifier)
+        .setWorkStatus(profile.nhanVienId, nextStatus);
+    if (nextStatus == 'TAM_NGHI') {
+      ref
+          .read(orderControllerProvider.notifier)
+          .releaseOffersForStaff(profile.nhanVienId);
+    } else {
+      ref.read(orderControllerProvider.notifier).retryWaitingOrders();
+    }
   }
 }
 
@@ -119,19 +206,29 @@ class _StaffShiftPanel extends StatelessWidget {
     required this.profile,
     required this.offerCount,
     required this.activeCount,
+    required this.onToggleAvailability,
   });
 
   final StaffProfile? profile;
   final int offerCount;
   final int activeCount;
+  final VoidCallback? onToggleAvailability;
 
   @override
   Widget build(BuildContext context) {
+    final workStatus = profile?.trangThaiLamViec ?? 'TAM_NGHI';
+    final isAvailable = workStatus == 'SAN_SANG';
+    final isBusy = workStatus == 'DANG_THU_GOM';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         HomeBrandHeader(
-          title: 'Sẵn sàng nhận đơn',
+          title: isBusy
+              ? 'Đang thực hiện thu gom'
+              : isAvailable
+              ? 'Sẵn sàng nhận đơn'
+              : 'Đang tạm ngừng nhận đơn',
           subtitle:
               '${profile?.viTriHienTai ?? 'Chưa cập nhật vị trí'} • ${profile?.gioBatDau ?? '06:00'}-${profile?.gioKetThuc ?? '17:00'}',
           trailing: Container(
@@ -210,7 +307,12 @@ class _StaffShiftPanel extends StatelessWidget {
                     ],
                   ),
                 ),
-                const StatusChip(status: 'CHO_XU_LY', compact: true),
+                Switch(
+                  value: isAvailable,
+                  onChanged: isBusy || onToggleAvailability == null
+                      ? null
+                      : (_) => onToggleAvailability!(),
+                ),
               ],
             ),
           ),
@@ -239,8 +341,8 @@ class _StaffOfferPanel extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          title: 'Đơn mới gần bạn',
-          subtitle: 'Nhận hoặc từ chối để hệ thống chuyển tiếp',
+          title: 'Đơn đang chờ nhận',
+          subtitle: 'Nhân viên phù hợp nhận trước sẽ phụ trách đơn',
           trailing: Text(
             '${offers.length} đơn',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -268,19 +370,26 @@ class _StaffOfferPanel extends ConsumerWidget {
                 address: address,
                 waste: waste,
                 customer: customer,
-                onReject: () {
+                onReject: () async {
                   final user = ref.read(currentUserProvider);
                   if (user == null) return;
-                  ref
-                      .read(orderControllerProvider.notifier)
-                      .rejectOffer(maDon: order.maDon, nhanVienId: user.userId);
+                  await rejectStaffOffer(
+                    context,
+                    ref,
+                    order: order,
+                    staffId: user.userId,
+                  );
                 },
-                onAccept: () {
+                onAccept: () async {
                   final user = ref.read(currentUserProvider);
                   if (user == null) return;
-                  ref
-                      .read(orderControllerProvider.notifier)
-                      .acceptOffer(maDon: order.maDon, nhanVienId: user.userId);
+                  final accepted = await acceptStaffOrder(
+                    context,
+                    ref,
+                    order: order,
+                    staffId: user.userId,
+                  );
+                  if (!context.mounted || !accepted) return;
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => StaffOrderScreen(maDon: order.maDon),
@@ -395,13 +504,21 @@ class _OfferCard extends StatelessWidget {
                   : '${currentAddress.shortAddress}, ${currentAddress.quanHuyen}',
             ),
             const SizedBox(height: AppSpacing.md),
+            Text(
+              'Đơn mở cho nhân viên đang sẵn sàng',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.secondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: onReject,
                     icon: const Icon(Icons.close_outlined),
-                    label: const Text('Từ chối'),
+                    label: const Text('Bỏ qua'),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -467,6 +584,65 @@ class _AcceptedOrdersList extends StatelessWidget {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _OrderHistoryList extends StatelessWidget {
+  const _OrderHistoryList({
+    required this.orders,
+    required this.addresses,
+    required this.wastes,
+    required this.onViewHistory,
+  });
+
+  final List<PickupOrder> orders;
+  final List<CustomerAddress> addresses;
+  final List<WasteType> wastes;
+  final VoidCallback onViewHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          title: 'Đã xử lý trong ca',
+          subtitle: 'Đơn hoàn tất hoặc đã hủy',
+          trailing: TextButton.icon(
+            onPressed: onViewHistory,
+            icon: const Icon(Icons.history_outlined, size: 17),
+            label: const Text('Xem lịch sử'),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        if (orders.isEmpty)
+          const EmptyState(
+            icon: Icons.history_outlined,
+            title: 'Chưa có đơn đã xử lý',
+            message: 'Các đơn hoàn tất hoặc đã hủy sẽ hiện tại đây.',
+          )
+        else
+          ...orders
+              .take(2)
+              .map(
+                (order) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: OrderCard(
+                    order: order,
+                    address: _findAddress(addresses, order.diaChiId),
+                    wasteType: _findWaste(wastes, order.loaiRacId),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => StaffOrderScreen(maDon: order.maDon),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
       ],
     );
   }

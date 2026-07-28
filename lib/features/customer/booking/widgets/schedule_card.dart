@@ -64,22 +64,42 @@ class ScheduleCard extends StatelessWidget {
               ],
             ),
             const Divider(height: AppSpacing.xxl),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                for (final slot in timeSlots)
-                  _TimeSlotChip(
-                    label: slot,
-                    selected: khungGio == slot,
-                    onTap: () => onSelectSlot(slot),
+            if (timeSlots.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.accentLight,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Text(
+                  'Ngày này đã hết khung giờ nhận đơn. Vui lòng chọn ngày tiếp theo.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.text,
+                    fontWeight: FontWeight.w600,
                   ),
-              ],
-            ),
+                ),
+              )
+            else
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  for (final slot in timeSlots)
+                    _TimeSlotChip(
+                      label: slot,
+                      selected: khungGio == slot,
+                      onTap: () => onSelectSlot(slot),
+                    ),
+                ],
+              ),
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: kgController,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(
                 labelText: 'Khối lượng dự kiến',
                 suffixText: 'kg',
@@ -106,25 +126,28 @@ class _TimeSlotChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.pill),
-      onTap: onTap,
-      child: Container(
-        height: 34,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surfaceAlt,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+    return SizedBox(
+      width: AppSizes.timeSlotChipWidth,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onTap,
+        child: Container(
+          height: AppSizes.compactControlHeight,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+            ),
           ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: selected ? AppColors.textInverse : AppColors.text,
-            fontWeight: FontWeight.w800,
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: selected ? AppColors.textInverse : AppColors.text,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),

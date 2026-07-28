@@ -5,6 +5,7 @@ enum SchemaFieldType {
   timestamp,
   geoPoint,
   stringArray,
+  bytes,
 }
 
 class SchemaField {
@@ -97,7 +98,16 @@ const timeSlots = {
   '08-10',
 };
 const feeTypes = {'GOI_THANG', 'THEO_KG'};
-const assignmentStatuses = {'CHO_NHAN', 'DA_NHAN', 'TU_CHOI', 'HUY'};
+const assignmentSources = {'HE_THONG', 'ADMIN'};
+const assignmentStatuses = {
+  'CHO_PHAN_HOI',
+  'DA_NHAN',
+  'TU_CHOI',
+  'HET_HAN',
+  'HUY',
+  // Legacy value kept while existing assignment documents are migrated.
+  'CHO_NHAN',
+};
 const packageStatuses = {
   'CHO_THANH_TOAN',
   'CON_HIEU_LUC',
@@ -256,6 +266,26 @@ const greenTrashSchemas = <CollectionSchema>[
       ),
       SchemaField(
         name: 'viTriHienTai',
+        type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'toaDoLat',
+        type: SchemaFieldType.number,
+        required: false,
+      ),
+      SchemaField(
+        name: 'toaDoLng',
+        type: SchemaFieldType.number,
+        required: false,
+      ),
+      SchemaField(
+        name: 'capNhatViTriLuc',
+        type: SchemaFieldType.timestamp,
+        required: false,
+      ),
+      SchemaField(
+        name: 'phanCongDangChoId',
         type: SchemaFieldType.string,
         required: false,
       ),
@@ -487,6 +517,11 @@ const greenTrashSchemas = <CollectionSchema>[
         type: SchemaFieldType.timestamp,
         required: false,
       ),
+      SchemaField(
+        name: 'maDonCapNhatCuoi',
+        type: SchemaFieldType.string,
+        required: false,
+      ),
     ],
   ),
   CollectionSchema(
@@ -512,6 +547,26 @@ const greenTrashSchemas = <CollectionSchema>[
       SchemaField(
         name: 'nhanVienHienTaiId',
         type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'phanCongHienTaiId',
+        type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'nhanVienTuChoiIds',
+        type: SchemaFieldType.stringArray,
+        required: false,
+      ),
+      SchemaField(
+        name: 'soLanDeXuat',
+        type: SchemaFieldType.number,
+        required: false,
+      ),
+      SchemaField(
+        name: 'dangChoHoTro',
+        type: SchemaFieldType.boolean,
         required: false,
       ),
       SchemaField(
@@ -557,6 +612,36 @@ const greenTrashSchemas = <CollectionSchema>[
         type: SchemaFieldType.timestamp,
         required: true,
       ),
+      SchemaField(
+        name: 'ngayCapNhat',
+        type: SchemaFieldType.timestamp,
+        required: false,
+      ),
+      SchemaField(
+        name: 'daThongBaoNhanVienSapDen',
+        type: SchemaFieldType.boolean,
+        required: false,
+      ),
+      SchemaField(
+        name: 'daThongBaoNhanVienDaDen',
+        type: SchemaFieldType.boolean,
+        required: false,
+      ),
+      SchemaField(
+        name: 'lyDoHuy',
+        type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'bienBanId',
+        type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'thanhToanId',
+        type: SchemaFieldType.string,
+        required: false,
+      ),
     ],
   ),
   CollectionSchema(
@@ -577,7 +662,13 @@ const greenTrashSchemas = <CollectionSchema>[
       SchemaField(
         name: 'adminId',
         type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'nguonPhanCong',
+        type: SchemaFieldType.string,
         required: true,
+        allowedValues: assignmentSources,
       ),
       SchemaField(
         name: 'trangThaiPhanCong',
@@ -591,8 +682,28 @@ const greenTrashSchemas = <CollectionSchema>[
         required: true,
       ),
       SchemaField(
+        name: 'thoiGianHetHan',
+        type: SchemaFieldType.timestamp,
+        required: true,
+      ),
+      SchemaField(
+        name: 'thuTuDeXuat',
+        type: SchemaFieldType.number,
+        required: true,
+      ),
+      SchemaField(
+        name: 'thoiGianPhanHoi',
+        type: SchemaFieldType.timestamp,
+        required: false,
+      ),
+      SchemaField(
         name: 'lyDoTuChoi',
         type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'ngayCapNhat',
+        type: SchemaFieldType.timestamp,
         required: false,
       ),
     ],
@@ -625,6 +736,11 @@ const greenTrashSchemas = <CollectionSchema>[
       SchemaField(
         name: 'anhXacNhanUrl',
         type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'anhXacNhanBytes',
+        type: SchemaFieldType.bytes,
         required: false,
       ),
       SchemaField(

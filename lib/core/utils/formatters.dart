@@ -2,11 +2,14 @@ import 'package:intl/intl.dart';
 
 final _dateFormat = DateFormat('dd/MM/yyyy');
 final _dayMonthFormat = DateFormat('dd/MM');
+final _dateTimeFormat = DateFormat('HH:mm • dd/MM/yyyy');
 final _moneyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
 String formatDate(DateTime value) => _dateFormat.format(value);
 
 String formatDayMonth(DateTime value) => _dayMonthFormat.format(value);
+
+String formatDateTime(DateTime value) => _dateTimeFormat.format(value);
 
 String formatMoney(num value) => _moneyFormat.format(value);
 

@@ -7,12 +7,12 @@ This is the self-contained project brief for any contributor using ChatGPT, Gemi
 GreenTrash is a Vietnamese waste-pickup application with three roles:
 
 - **Customer**: manages addresses, chooses a waste type and time slot, books pickup, tracks the order, pays, manages a monthly package, views history, and submits complaints/reviews.
-- **Collection staff**: receives a nearby pickup offer, accepts or rejects it, travels to the pickup point, records actual waste weight and evidence, then completes the order.
-- **Admin/CSKH**: monitors operations, manages catalogue/price/package/account/complaint data, and intervenes only when the normal dispatcher cannot resolve an order or when an override is needed.
+- **Collection staff**: sees the shared open-order queue, claims or dismisses an order, travels to the pickup point, records actual waste weight and evidence, then completes the order.
+- **Admin/CSKH**: monitors operations, manages catalogue/price/package/account/complaint data, and intervenes only for exceptions or overrides.
 
 The application is mobile-first. Admin screens are currently mobile-responsive Flutter screens; a separate desktop web experience is a later scope, not a reason to introduce a different visual language.
 
-## 2. Current Reality: Mock Flow, Not a Live Backend
+## 2. Current Reality: Mock UI With a Backend Foundation
 
 The visible app is a functional UI prototype with in-memory Riverpod state.
 
@@ -21,25 +21,29 @@ The visible app is a functional UI prototype with in-memory Riverpod state.
 - Login is a demo role/session switch, not Firebase Authentication.
 - Creating, accepting, rejecting, cancelling, and updating an order affects the current app session only.
 - A hot restart resets all data to seed values.
-- Firebase packages, Firebase options, and an audited Firestore contract are present, but `main.dart` does not initialize Firebase and the active repository does not call Firestore.
+- `main.dart` initializes Firebase, and a Spark-compatible open-order adapter
+  exists, but the visible UI still uses the mock providers.
 
-Never claim that a screen is already persisted or realtime unless a Firebase repository has actually been connected and verified.
+Never claim that a screen is persisted or realtime until that screen has been
+switched to the production providers and verified with Firebase Auth.
 
 ## 3. Agreed Core Order Flow
 
-The product uses direct staff offers, similar to a delivery app. It must not require an admin to manually assign every ordinary order.
+The course-project flow uses a shared open-order queue, similar to a delivery
+app. It does not require admin assignment or Cloud Functions.
 
 ```text
 Customer submits a pickup order
   -> order is CHO_XU_LY
-  -> dispatcher chooses one eligible nearby/available staff member
-  -> staff receives a new-order offer and notification
-  -> staff accepts: DA_NHAN; that staff becomes nhanVienHienTaiId
-  -> staff rejects: record the rejection; dispatch to the next eligible staff member
-  -> no eligible staff remains: keep CHO_XU_LY for admin/CSKH exception handling
+  -> all available staff can see the order
+  -> first atomic claim: DA_NHAN; that staff becomes nhanVienHienTaiId
+  -> dismiss: record the reason and hide it only for that staff member
+  -> nobody claims yet: keep CHO_XU_LY
 ```
 
-The current mock chooses staff who are `SAN_SANG`, prefers the same district, then uses lower current revenue as a tie-breaker. This is a prototype heuristic, not a production geospatial matching algorithm.
+The current mock and Firestore adapter both use this open queue. Client
+validation checks readiness, work time, schedule conflicts, and ETA. The
+Firestore transaction prevents two staff members from accepting one order.
 
 Admin manual assignment is an exception/override. It may create a `CHO_NHAN` waiting state for the selected staff member, but it is not the normal path.
 
@@ -62,9 +66,11 @@ Read these before changing a feature. Do not rely only on a screenshot or an old
 3. `docs/Documentation/Firestore_Data_Audit.md`: observed facts from the real Firestore database.
 4. `lib/schema_contract.dart`: code-level collection, field, type, and enum contract.
 5. `docs/firestore_schema.json`: portable JSON representation of the audited schema; useful when handing context to another AI.
-5. `docs/screens/<relevant-screen>.md`: screen-specific requirements.
-6. UI work additionally requires `docs/ui-style-guide.md`, `docs/design-tokens.md`, `docs/ui-guardrails.md`, `docs/ui-audit-checklist.md`, and `docs/references/auth-home-reference.png`.
-7. Inspect the existing feature and shared widgets before writing a new widget.
+6. `docs/backend-order-workflow.md`: order persistence, open-queue logic,
+   security, activation, and deployment boundaries.
+7. `docs/screens/<relevant-screen>.md`: screen-specific requirements.
+8. UI work additionally requires `docs/ui-style-guide.md`, `docs/design-tokens.md`, `docs/ui-guardrails.md`, `docs/ui-audit-checklist.md`, and `docs/references/auth-home-reference.png`.
+9. Inspect the existing feature and shared widgets before writing a new widget.
 
 If sources disagree, use this priority:
 
@@ -78,7 +84,7 @@ If sources disagree, use this priority:
 ```text
 lib/
   main.dart                         application entry point and MaterialApp
-  firebase_options.dart             Firebase project options; not active at runtime yet
+  firebase_options.dart             active Firebase project options
   schema_contract.dart              audited Firestore collections, fields, and enums
   core/
     theme/app_theme.dart            AppColors, AppSpacing, AppRadius, AppSizes, theme
@@ -98,12 +104,19 @@ lib/
       order_detail/                 order detail screen and detail widgets
     staff/                          staff home and order-handling screens
     admin/                          dashboard and manual exception assignment screens
+    orders/
+      domain/                       commands, assignments, repository contract
+      data/                         Firestore mappers and atomic repository
+      application/                  production Riverpod providers
+functions/                          optional advanced matching; not required
 docs/
   screens/                          individual screen specifications
   Documentation/                    project context and Firestore audit
   references/                       visual reference image
   logo/                             approved logo assets
 test/                               widget and customer screen smoke tests
+firestore.rules                     uppercase classroom security rules
+firestore.indexes.json              Firestore query indexes
 ```
 
 Do not collapse a feature back into one giant file. Keep reusable presentation widgets in a local `widgets/` folder; move a component to `lib/shared/widgets/` only when it is reused by multiple features.
@@ -115,9 +128,12 @@ The app uses Flutter Material and Riverpod.
 - Use providers for app-wide/readable state. Keep UI rendering in feature screens and reusable widgets.
 - `greenTrashRepositoryProvider` currently returns `MockGreenTrashRepository`.
 - `currentSessionProvider` stores the demo session.
-- `orderControllerProvider` owns mock order mutation and exposes selectors such as customer orders, staff offers, staff accepted orders, and admin orders.
+- `orderControllerProvider` owns mock order mutation and exposes selectors such
+  as customer orders, staff open orders, staff accepted orders, and admin
+  orders.
 - Do not change models, provider ownership, repository semantics, order lifecycle, or navigation merely to make a UI task easier.
-- Do not duplicate business logic in a screen. A future real repository/service should own persistence, transactions, and mapping.
+- Do not duplicate business logic in a screen. The order repository owns
+  Firestore persistence and atomic claim transactions.
 
 Core order-flow files are sensitive. Do not alter `lib/models/app_models.dart`, `lib/providers/app_providers.dart`, `lib/repositories/green_trash_repository.dart`, `lib/schema_contract.dart`, `firestore.rules`, or customer/staff order-flow screens unless the task explicitly asks for core-flow or backend work.
 
@@ -125,7 +141,9 @@ Core order-flow files are sensitive. Do not alter `lib/models/app_models.dart`, 
 
 ### Actual database naming
 
-The real `greentrashdb` database uses uppercase Vietnamese collection names. Collection names are case-sensitive. Do not use the old lower_snake_case names from the current `firestore.rules` file.
+The real `greentrashdb` database uses uppercase Vietnamese collection names.
+Collection names are case-sensitive. `firestore.rules` is now aligned to this
+contract; never reintroduce the old lower_snake_case names.
 
 | Collection | Purpose | Important fields |
 |---|---|---|
@@ -170,13 +188,19 @@ The real `greentrashdb` database uses uppercase Vietnamese collection names. Col
 - One payment stores `GOI_THANG` in `phuongThuc`, although it is a fee type rather than a payment method.
 - Some audited Vietnamese text may be encoding-damaged. Treat it as display data; do not invent enum values from it.
 
-### Direct-offer migration gap
+### Open-queue persistence
 
-The mock model uses `nhanVienDeXuatId` and `nhanVienTuChoiIds`, but the audited `DON_THU_GOM` contract does not contain them. `PHAN_CONG_THU_GOM.adminId` is currently required, so it cannot yet cleanly represent an offer created by the system.
+Open orders are read from `DON_THU_GOM` with `trangThai = CHO_XU_LY`.
+`nhanVienTuChoiIds` stores staff who dismissed an order. A claim creates
+`PHAN_CONG_THU_GOM.DA_NHAN` and sets `nhanVienHienTaiId` plus
+`phanCongHienTaiId` in one transaction. A dismissal creates
+`PHAN_CONG_THU_GOM.TU_CHOI`.
 
-Before real backend work, the team must approve one schema design: either extend `PHAN_CONG_THU_GOM` for system offers/admin overrides, or add proposal fields to `DON_THU_GOM`. Then update the Firestore schema contract, security rules, indexes, mappers, tests, and documentation together. Do not quietly add fields from a UI screen.
+The selected classroom backend uses Spark-compatible client transactions.
+Blaze and Cloud Functions are not required.
 
-`firestore.rules` is currently an old lower_snake_case ruleset and is incompatible with the audited database. Do not deploy it.
+Existing assignment data must be migrated before live activation. Read
+`docs/backend-order-workflow.md` before deployment.
 
 ## 8. UI Design System
 
@@ -235,14 +259,19 @@ Implemented at UI/mock-flow level:
 
 - Login, sign-up, forgot-password, verify-OTP screens.
 - Customer home, booking, order detail/tracking, cancellation action, package summary, order list, and notification cards.
-- Staff home with new-order offers, accept/reject, accepted jobs, and order status handling.
+- Staff home with an open-order queue, claim/dismiss, accepted jobs, and order status handling.
 - Admin dashboard and manual exception assignment.
 
-Not yet completed as real end-to-end backend features:
+Implemented as backend code but not yet connected to the visible screens:
 
-- Firebase Auth session/profile handling.
-- Firestore reads/writes, realtime listeners, transactions, and security rules aligned to uppercase collections.
-- Direct-offer persistence and real push notifications.
+- Firestore reads/writes, realtime listeners, atomic workflow transactions,
+  uppercase security rules, indexes, and open-queue persistence.
+
+Not yet completed as live end-to-end features:
+
+- Firebase Auth session/profile handling and switching screens to production
+  providers.
+- FCM device-token registration and push delivery.
 - Cloud Storage evidence upload.
 - Payment gateway, invoice PDF, staff revenue reconciliation, full package purchase/renewal, complaint/review management, profile/address CRUD, and reporting data.
 
@@ -272,7 +301,8 @@ flutter test, then report the result and any remaining backend dependency.
 
 - Do not overwrite or revert somebody else's uncommitted work.
 - Do not use guessed Firestore names, fields, roles, or statuses.
-- Do not deploy the current Firestore rules file.
+- Do not deploy Firestore or Functions before migration, dry-run, and owner
+  review.
 - Do not turn a UI request into a schema/business-flow refactor.
 - Do not turn a mock interaction into a fake claim of backend completion.
 - Ask the task owner when a requirement needs new Firestore fields, a new order status, a schema migration, or a cross-feature shared abstraction.

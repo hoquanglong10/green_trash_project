@@ -1,8 +1,11 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../orders/application/order_workflow_providers.dart';
+import '../../orders/domain/order_workflow_models.dart';
 import '../../../models/app_models.dart';
 import '../../../providers/app_providers.dart';
 import '../../../shared/widgets/app_widgets.dart';
@@ -29,11 +32,20 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   String? _loaiRacId;
   String? _khungGio;
   String _hinhThucTinhPhi = 'GOI_THANG';
-  DateTime _ngayThuGom = DateTime(2026, 7, 9);
+  late DateTime _ngayThuGom;
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    final slots = ref.read(timeSlotsProvider);
+    _ngayThuGom = defaultBookingDate(now, slots);
+    final availableSlots = availableTimeSlots(
+      date: _ngayThuGom,
+      timeSlots: slots,
+      now: now,
+    );
+    _khungGio = availableSlots.isEmpty ? null : availableSlots.first;
     _kgController.addListener(_refreshEstimate);
   }
 
@@ -55,17 +67,27 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final addresses = ref.watch(customerAddressesProvider);
     final wastes = ref.watch(wasteTypesProvider);
     final prices = ref.watch(pricesProvider);
-    final timeSlots = ref.watch(timeSlotsProvider);
+    final allTimeSlots = ref.watch(timeSlotsProvider);
     final staff = ref.watch(staffProfilesProvider);
     final subscription = ref.watch(currentSubscriptionProvider);
     final packages = ref.watch(packagesProvider);
     final package = packages.isEmpty ? null : packages.first;
+    final customerOrders = ref.watch(customerOrdersProvider);
+    final now = DateTime.now();
+    final timeSlots = availableTimeSlots(
+      date: _ngayThuGom,
+      timeSlots: allTimeSlots,
+      now: now,
+    );
+    final selectedSlot = timeSlots.contains(_khungGio) ? _khungGio : null;
+    final hasActivePackage =
+        subscription != null &&
+        subscription.trangThai == 'CON_HL' &&
+        package != null;
+    final paymentMethod = hasActivePackage ? _hinhThucTinhPhi : 'THEO_KG';
 
     _diaChiId ??= addresses.isNotEmpty ? addresses.first.diaChiId : null;
     _loaiRacId ??= wastes.isNotEmpty ? wastes.first.loaiRacId : null;
-    _khungGio ??= timeSlots.isEmpty
-        ? null
-        : (timeSlots.length > 1 ? timeSlots[1] : timeSlots.first);
 
     final selectedAddress = findAddress(addresses, _diaChiId);
     final selectedWaste = findWaste(wastes, _loaiRacId);
@@ -76,23 +98,30 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     );
     final kg = _selectedKg;
     final estimate = estimatePaymentLabel(
-      paymentMethod: _hinhThucTinhPhi,
+      paymentMethod: paymentMethod,
       price: selectedPrice,
       kg: kg,
       subscription: subscription,
       package: package,
     );
-    final canSubmit =
-        selectedAddress != null &&
-        selectedWaste != null &&
-        _khungGio != null &&
-        kg != null &&
-        kg > 0;
+    final validation = validateBooking(
+      address: selectedAddress,
+      waste: selectedWaste,
+      kg: kg,
+      pickupDate: _ngayThuGom,
+      timeSlot: selectedSlot,
+      availableSlots: timeSlots,
+      paymentMethod: paymentMethod,
+      subscription: subscription,
+      package: package,
+      customerOrders: customerOrders,
+      now: now,
+    );
 
     return AppPage(
       maxWidth: 760,
       title: 'Đặt lịch thu gom',
-      subtitle: 'Gửi đơn cho nhân viên gần nhất',
+      subtitle: 'Gửi đơn đến nhân viên đang sẵn sàng',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.screenHorizontal,
@@ -104,7 +133,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           HomeBrandHeader(
             title: 'Lập đơn thu gom mới',
             subtitle:
-                'Chọn thông tin thu gom, hệ thống sẽ ưu tiên nhân viên gần khu vực của bạn.',
+                'Chọn thông tin thu gom, đơn sẽ xuất hiện trong danh sách chờ nhận của nhân viên.',
             trailing: Container(
               width: 46,
               height: 46,
@@ -145,7 +174,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           const SizedBox(height: AppSpacing.sectionGap),
           const SectionHeader(
             title: 'Loại rác',
-            subtitle: 'Dựa theo schema loai_rac và dich_vu_gia_bieu',
+            subtitle: 'Chọn đúng nhóm rác để ước tính chi phí',
           ),
           const SizedBox(height: AppSpacing.sm),
           LayoutBuilder(
@@ -178,7 +207,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           const SizedBox(height: AppSpacing.sm),
           ScheduleCard(
             ngayThuGom: _ngayThuGom,
-            khungGio: _khungGio,
+            khungGio: selectedSlot,
             timeSlots: timeSlots,
             kgController: _kgController,
             onPickDate: _pickDate,
@@ -195,6 +224,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             package: package,
             subscription: subscription,
             selectedPrice: selectedPrice,
+            packageAvailable: hasActivePackage,
             onChanged: (value) => setState(() => _hinhThucTinhPhi = value),
           ),
           const SizedBox(height: AppSpacing.sectionGap),
@@ -216,18 +246,24 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             staff: suggestedStaff,
             kg: kg,
             date: _ngayThuGom,
-            timeSlot: _khungGio,
-            paymentMethod: _hinhThucTinhPhi,
+            timeSlot: selectedSlot,
+            paymentMethod: paymentMethod,
             estimate: estimate,
           ),
           const SizedBox(height: AppSpacing.md),
           BookingSubmitPanel(
-            canSubmit: canSubmit,
+            canSubmit: validation.canSubmit,
             estimate: estimate,
             staffLabel: suggestedStaff == null
-                ? 'Đang tìm nhân viên'
+                ? 'Đơn sẽ vào hàng chờ hỗ trợ'
                 : 'Gửi đến ${suggestedStaff.maNhanVien}',
-            onSubmit: () => _createOrder(user),
+            validationMessage: validation.message,
+            onSubmit: () => _createOrder(
+              user,
+              validation: validation,
+              paymentMethod: paymentMethod,
+              selectedSlot: selectedSlot,
+            ),
           ),
         ],
       ),
@@ -241,51 +277,121 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final firstDate = DateTime(now.year, now.month, now.day);
     final picked = await showDatePicker(
       context: context,
       initialDate: _ngayThuGom,
-      firstDate: DateTime(2026, 7, 8),
-      lastDate: DateTime(2026, 12, 31),
+      firstDate: firstDate,
+      lastDate: firstDate.add(const Duration(days: 90)),
     );
     if (picked != null) {
-      setState(() => _ngayThuGom = picked);
+      final availableSlots = availableTimeSlots(
+        date: picked,
+        timeSlots: ref.read(timeSlotsProvider),
+        now: now,
+      );
+      setState(() {
+        _ngayThuGom = picked;
+        _khungGio = availableSlots.isEmpty ? null : availableSlots.first;
+      });
     }
   }
 
-  void _createOrder(AppUser user) {
+  Future<void> _createOrder(
+    AppUser user, {
+    required BookingValidation validation,
+    required String paymentMethod,
+    required String? selectedSlot,
+  }) async {
     final kg = _selectedKg;
-    if (_diaChiId == null ||
+    if (!validation.canSubmit ||
+        _diaChiId == null ||
         _loaiRacId == null ||
-        _khungGio == null ||
+        selectedSlot == null ||
         kg == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng kiểm tra lại thông tin đặt lịch.'),
+        SnackBar(
+          content: Text(
+            validation.message ?? 'Vui lòng kiểm tra lại thông tin đặt lịch.',
+          ),
         ),
       );
       return;
     }
 
-    final order = ref
-        .read(orderControllerProvider.notifier)
-        .createOrder(
-          khachHangId: user.userId,
-          diaChiId: _diaChiId!,
-          loaiRacId: _loaiRacId!,
-          khoiLuongDuKien: kg,
-          ngayThuGom: _ngayThuGom,
-          khungGio: _khungGio!,
-          hinhThucTinhPhi: _hinhThucTinhPhi,
-          ghiChu: _noteController.text.trim(),
-        );
+    try {
+      final order = ref.read(firebaseEnabledProvider)
+          ? await ref
+                .read(orderWorkflowRepositoryProvider)
+                .createOrder(
+                  CreatePickupOrderCommand(
+                    khachHangId: user.userId,
+                    diaChiId: _diaChiId!,
+                    loaiRacId: _loaiRacId!,
+                    khoiLuongDuKien: kg,
+                    ngayThuGom: _ngayThuGom,
+                    khungGio: selectedSlot,
+                    hinhThucTinhPhi: paymentMethod,
+                    ghiChu: _noteController.text.trim(),
+                  ),
+                )
+          : ref
+                .read(orderControllerProvider.notifier)
+                .createOrder(
+                  khachHangId: user.userId,
+                  diaChiId: _diaChiId!,
+                  loaiRacId: _loaiRacId!,
+                  khoiLuongDuKien: kg,
+                  ngayThuGom: _ngayThuGom,
+                  khungGio: selectedSlot,
+                  hinhThucTinhPhi: paymentMethod,
+                  ghiChu: _noteController.text.trim(),
+                );
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => OrderDetailScreen(maDon: order.maDon)),
-    );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => OrderDetailScreen(maDon: order.maDon),
+        ),
+      );
+    } on OrderWorkflowException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on FirebaseException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_firebaseBookingMessage(error))));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Khong the tao don luc nay. Vui long thu lai.'),
+          ),
+        );
+      }
+    }
   }
 
   void _refreshEstimate() {
     if (mounted) setState(() {});
+  }
+
+  String _firebaseBookingMessage(FirebaseException error) {
+    return switch (error.code) {
+      'permission-denied' =>
+        'Firestore dang tu choi tao don. Can cap nhat Rules cua project truoc khi dat lich.',
+      'unauthenticated' =>
+        'Phien dang nhap da het han. Vui long dang nhap lai.',
+      'unavailable' =>
+        'Khong ket noi duoc Firestore. Kiem tra mang roi thu lai.',
+      _ => error.message ?? 'Firestore khong the tao don (${error.code}).',
+    };
   }
 }
 
@@ -295,6 +401,7 @@ class _PaymentMethodSection extends StatelessWidget {
     required this.package,
     required this.subscription,
     required this.selectedPrice,
+    required this.packageAvailable,
     required this.onChanged,
   });
 
@@ -302,6 +409,7 @@ class _PaymentMethodSection extends StatelessWidget {
   final PickupPackage? package;
   final PackageSubscription? subscription;
   final PriceItem? selectedPrice;
+  final bool packageAvailable;
   final ValueChanged<String> onChanged;
 
   @override
@@ -312,8 +420,10 @@ class _PaymentMethodSection extends StatelessWidget {
       title: 'Gói tháng',
       subtitle: package == null
           ? 'Chưa có gói'
-          : '${formatKg(subscription?.soKgConLai ?? package!.hanMucKgThang)} còn lại',
-      onTap: () => onChanged('GOI_THANG'),
+          : packageAvailable
+          ? '${formatKg(subscription?.soKgConLai ?? package!.hanMucKgThang)} còn lại'
+          : 'Gói không còn hiệu lực',
+      onTap: packageAvailable ? () => onChanged('GOI_THANG') : null,
     );
     final byKgMethod = PaymentMethodCard(
       selected: paymentMethod == 'THEO_KG',

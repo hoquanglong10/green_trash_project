@@ -10,7 +10,20 @@ void main() {
     expect(schema!.documentIdField, 'maDon');
     expect(schema.fieldNames, contains('khachHangId'));
     expect(schema.fieldNames, contains('nhanVienHienTaiId'));
+    expect(schema.fieldNames, contains('phanCongHienTaiId'));
+    expect(schema.fieldNames, contains('nhanVienTuChoiIds'));
+    expect(schema.fieldNames, contains('soLanDeXuat'));
     expect(schema.fieldNames, contains('trangThai'));
+  });
+
+  test('assignment contract supports classroom staff responses', () {
+    final schema = greenTrashSchemaByName[phanCongThuGomCollection];
+
+    expect(schema, isNotNull);
+    expect(schema!.fieldNames, contains('nguonPhanCong'));
+    expect(schema.fieldNames, contains('thoiGianHetHan'));
+    expect(schema.fieldNames, contains('thoiGianPhanHoi'));
+    expect(assignmentStatuses, contains('CHO_PHAN_HOI'));
   });
 
   testWidgets('app starts on login screen', (tester) async {

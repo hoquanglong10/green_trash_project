@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/status_mapper.dart';
+import '../notifications/presentation/customer_notifications_screen.dart';
+import '../notifications/presentation/widgets/notification_bell.dart';
 import '../../models/app_models.dart';
 import '../../providers/app_providers.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../orders/presentation/order_history_screen.dart';
 import 'booking_screen.dart';
 import 'order_detail_screen.dart';
 
@@ -40,17 +43,22 @@ class CustomerHomeScreen extends ConsumerWidget {
       appBarSubtitleColor: AppColors.opacity(HomeTrialColors.white, 0.82),
       leading: IconButton(
         tooltip: 'Đăng xuất',
-        onPressed: () => ref.read(currentSessionProvider.notifier).state = null,
+        onPressed: () async {
+          await ref.read(firebaseAuthenticationServiceProvider).signOut();
+          ref.read(currentSessionProvider.notifier).state = null;
+        },
         icon: const Icon(Icons.menu_rounded, size: 32),
       ),
       actions: [
-        SizedBox(
-          width: kToolbarHeight,
-          child: IconButton(
-            tooltip: 'Thông báo',
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none_outlined, size: 32),
-          ),
+        NotificationBell(
+          notifications: notifications,
+          onViewAll: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const CustomerNotificationsScreen(),
+              ),
+            );
+          },
         ),
       ],
       child: LayoutBuilder(
@@ -75,11 +83,10 @@ class CustomerHomeScreen extends ConsumerWidget {
           );
           final activityColumn = _CustomerActivityColumn(
             orders: orders,
-            notifications: notifications,
             addresses: allAddresses,
             wastes: wastes,
             staff: staff,
-            orderLimit: wide ? 5 : 3,
+            onViewHistory: () => _openHistory(context),
           );
 
           if (wide) {
@@ -124,6 +131,15 @@ class CustomerHomeScreen extends ConsumerWidget {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const BookingScreen()));
+  }
+
+  static void _openHistory(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            const OrderHistoryScreen(audience: OrderHistoryAudience.customer),
+      ),
+    );
   }
 }
 
@@ -464,7 +480,7 @@ class _LiveOrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
-                      'Tạo đơn mới để hệ thống gửi cho nhân viên gần bạn.',
+                      'Tạo đơn mới để nhân viên đang sẵn sàng có thể nhận.',
                       style: Theme.of(
                         context,
                       ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
@@ -487,8 +503,8 @@ class _LiveOrderCard extends StatelessWidget {
     final message = switch (currentOrder.trangThai) {
       'CHO_XU_LY' =>
         assignedStaff == null
-            ? 'Đang tìm nhân viên gần khu vực của bạn.'
-            : 'Đã gửi thông báo đến ${assignedStaff.maNhanVien}.',
+            ? 'Đơn đang chờ nhân viên sẵn sàng nhận.'
+            : 'Đang chờ ${assignedStaff.maNhanVien} xác nhận.',
       'DA_NHAN' =>
         assignedStaff == null
             ? 'Nhân viên đã nhận đơn.'
@@ -706,19 +722,17 @@ class _PaymentStatusBadge extends StatelessWidget {
 class _CustomerActivityColumn extends StatelessWidget {
   const _CustomerActivityColumn({
     required this.orders,
-    required this.notifications,
     required this.addresses,
     required this.wastes,
     required this.staff,
-    required this.orderLimit,
+    required this.onViewHistory,
   });
 
   final List<PickupOrder> orders;
-  final List<AppNotification> notifications;
   final List<CustomerAddress> addresses;
   final List<WasteType> wastes;
   final List<StaffProfile> staff;
-  final int orderLimit;
+  final VoidCallback onViewHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -728,12 +742,10 @@ class _CustomerActivityColumn extends StatelessWidget {
         _HomeSectionHeader(
           title: 'Đơn gần đây',
           subtitle: 'Theo dõi các đơn đã đặt',
-          trailing: Text(
-            '${orders.length} đơn',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: HomeTrialColors.green,
-              fontWeight: FontWeight.w800,
-            ),
+          trailing: TextButton.icon(
+            onPressed: onViewHistory,
+            icon: const Icon(Icons.history_outlined, size: 17),
+            label: const Text('Xem lịch sử'),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -745,7 +757,7 @@ class _CustomerActivityColumn extends StatelessWidget {
           )
         else
           ...orders
-              .take(orderLimit)
+              .take(2)
               .map(
                 (order) => Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -758,27 +770,6 @@ class _CustomerActivityColumn extends StatelessWidget {
                       order.nhanVienHienTaiId ?? order.nhanVienDeXuatId,
                     ),
                   ),
-                ),
-              ),
-        const SizedBox(height: AppSpacing.lg),
-        const _HomeSectionHeader(
-          title: 'Thông báo',
-          subtitle: 'Cập nhật mới nhất',
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        if (notifications.isEmpty)
-          const EmptyState(
-            icon: Icons.notifications_none,
-            title: 'Không có thông báo mới',
-            message: 'Khi có cập nhật về đơn, bạn sẽ thấy tại đây.',
-          )
-        else
-          ...notifications
-              .take(3)
-              .map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: _NotificationCard(notification: item),
                 ),
               ),
       ],
@@ -920,7 +911,7 @@ class _RecentOrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final assignedStaff = staffProfile;
     final assigneeLabel = assignedStaff == null
-        ? 'Đang tìm nhân viên'
+        ? 'Đang chờ nhận'
         : order.nhanVienHienTaiId == null
         ? 'Đã báo ${assignedStaff.maNhanVien}'
         : '${assignedStaff.maNhanVien} đã nhận';
@@ -1019,80 +1010,6 @@ class _RecentOrderCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({required this.notification});
-
-  final AppNotification notification;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: HomeTrialColors.white,
-      shape: _homeCardShape(),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: notification.trangThaiDoc == 'CHUA_DOC'
-                    ? HomeTrialColors.blueSoft
-                    : HomeTrialColors.purpleSoft,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Icon(
-                Icons.notifications_none,
-                color: notification.trangThaiDoc == 'CHUA_DOC'
-                    ? HomeTrialColors.blue
-                    : HomeTrialColors.purple,
-                size: 19,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    notification.tieuDe,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: HomeTrialColors.slate,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    notification.noiDung,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: HomeTrialColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (notification.trangThaiDoc == 'CHUA_DOC')
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: HomeTrialColors.amber,
-                  shape: BoxShape.circle,
-                ),
-              ),
-          ],
         ),
       ),
     );

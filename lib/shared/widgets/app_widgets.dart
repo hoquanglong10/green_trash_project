@@ -848,13 +848,16 @@ class OrderTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (status == 'HUY') {
+      return const _TimelineRow(status: 'HUY', done: true, last: true);
+    }
     final currentIndex = orderStatusIndex(status);
     return Column(
       children: [
         for (var index = 0; index < orderTimeline.length; index++)
           _TimelineRow(
             status: orderTimeline[index],
-            done: status == 'HUY' ? false : index <= currentIndex,
+            done: index <= currentIndex,
             last: index == orderTimeline.length - 1,
           ),
       ],

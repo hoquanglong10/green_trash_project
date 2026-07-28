@@ -1,0 +1,63 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "DON_THU_GOM",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "khachHangId", "order": "ASCENDING"},
+        {"fieldPath": "ngayTao", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "DON_THU_GOM",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "nhanVienHienTaiId", "order": "ASCENDING"},
+        {"fieldPath": "ngayThuGom", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "DON_THU_GOM",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "nhanVienHienTaiId", "order": "ASCENDING"},
+        {"fieldPath": "trangThai", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "DON_THU_GOM",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "trangThai", "order": "ASCENDING"},
+        {"fieldPath": "ngayThuGom", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "DON_THU_GOM",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "trangThai", "order": "ASCENDING"},
+        {"fieldPath": "dangChoHoTro", "order": "ASCENDING"},
+        {"fieldPath": "ngayTao", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "PHAN_CONG_THU_GOM",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "nhanVienId", "order": "ASCENDING"},
+        {"fieldPath": "trangThaiPhanCong", "order": "ASCENDING"},
+        {"fieldPath": "thoiGianHetHan", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "PHAN_CONG_THU_GOM",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "trangThaiPhanCong", "order": "ASCENDING"},
+        {"fieldPath": "thoiGianHetHan", "order": "ASCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

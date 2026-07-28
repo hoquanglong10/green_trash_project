@@ -1,15 +1,47 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/auth/data/firebase_authentication_service.dart';
+import '../features/orders/domain/order_history_sort.dart';
+import '../features/orders/application/order_workflow_providers.dart';
+import '../features/reference_data/application/reference_data_providers.dart';
 import '../models/app_models.dart';
 import '../repositories/green_trash_repository.dart';
+import 'mock_event_controllers.dart';
+import 'order_controller.dart';
 
 final greenTrashRepositoryProvider = Provider<GreenTrashRepository>((ref) {
   return MockGreenTrashRepository();
 });
 
+final firebaseEnabledProvider = Provider<bool>((ref) {
+  try {
+    return Firebase.apps.isNotEmpty;
+  } catch (_) {
+    return false;
+  }
+});
+
+final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
+  return FirebaseAuth.instance;
+});
+
+final firebaseAuthenticationServiceProvider =
+    Provider<FirebaseAuthenticationService>((ref) {
+      return FirebaseAuthenticationService(
+        ref.watch(firebaseAuthProvider),
+        ref.watch(firebaseFirestoreProvider),
+      );
+    });
+
 final currentSessionProvider = StateProvider<AppSession?>((ref) => null);
 
 final usersProvider = Provider<List<AppUser>>((ref) {
+  if (ref.watch(firebaseEnabledProvider)) {
+    final user = ref.watch(currentUserProvider);
+    return user == null ? const [] : [user];
+  }
   return ref.watch(greenTrashRepositoryProvider).users;
 });
 
@@ -17,62 +49,179 @@ final currentUserProvider = Provider<AppUser?>((ref) {
   return ref.watch(currentSessionProvider)?.user;
 });
 
+final staffProfileControllerProvider =
+    StateNotifierProvider<StaffProfileController, List<StaffProfile>>((ref) {
+      return StaffProfileController(
+        ref.watch(greenTrashRepositoryProvider).staff,
+      );
+    });
+
 final staffProfilesProvider = Provider<List<StaffProfile>>((ref) {
-  return ref.watch(greenTrashRepositoryProvider).staff;
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref.watch(firestoreStaffProfilesProvider).valueOrNull ?? const [];
+  }
+  return ref.watch(staffProfileControllerProvider);
 });
 
 final customerAddressesProvider = Provider<List<CustomerAddress>>((ref) {
   final user = ref.watch(currentUserProvider);
-  final addresses = ref.watch(greenTrashRepositoryProvider).addresses;
   if (user == null) return const [];
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref
+            .watch(firestoreCustomerAddressesProvider(user.userId))
+            .valueOrNull ??
+        const [];
+  }
+  final addresses = ref.watch(greenTrashRepositoryProvider).addresses;
   return addresses
       .where((address) => address.khachHangId == user.userId)
       .toList();
 });
 
 final allAddressesProvider = Provider<List<CustomerAddress>>((ref) {
+  if (ref.watch(firebaseEnabledProvider)) {
+    final user = ref.watch(currentUserProvider);
+    if (user?.role == UserRole.customer) {
+      return ref.watch(customerAddressesProvider);
+    }
+    return ref.watch(firestoreAllAddressesProvider).valueOrNull ?? const [];
+  }
   return ref.watch(greenTrashRepositoryProvider).addresses;
 });
 
 final wasteTypesProvider = Provider<List<WasteType>>((ref) {
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref.watch(firestoreWasteTypesProvider).valueOrNull ?? const [];
+  }
   return ref.watch(greenTrashRepositoryProvider).wasteTypes;
 });
 
 final pricesProvider = Provider<List<PriceItem>>((ref) {
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref.watch(firestorePriceItemsProvider).valueOrNull ?? const [];
+  }
   return ref.watch(greenTrashRepositoryProvider).prices;
 });
 
 final packagesProvider = Provider<List<PickupPackage>>((ref) {
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref.watch(firestorePackagesProvider).valueOrNull ?? const [];
+  }
   return ref.watch(greenTrashRepositoryProvider).packages;
 });
 
+final subscriptionControllerProvider =
+    StateNotifierProvider<
+      PackageSubscriptionController,
+      List<PackageSubscription>
+    >((ref) {
+      return PackageSubscriptionController(
+        ref.watch(greenTrashRepositoryProvider).subscriptions,
+      );
+    });
+
 final subscriptionsProvider = Provider<List<PackageSubscription>>((ref) {
-  return ref.watch(greenTrashRepositoryProvider).subscriptions;
+  final user = ref.watch(currentUserProvider);
+  if (ref.watch(firebaseEnabledProvider)) {
+    if (user?.role != UserRole.customer) return const [];
+    return ref
+            .watch(firestoreCustomerSubscriptionsProvider(user!.userId))
+            .valueOrNull ??
+        const [];
+  }
+  return ref.watch(subscriptionControllerProvider);
 });
 
 final currentSubscriptionProvider = Provider<PackageSubscription?>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return null;
   for (final subscription in ref.watch(subscriptionsProvider)) {
-    if (subscription.khachHangId == user.userId) {
+    if (subscription.khachHangId == user.userId &&
+        {'CON_HL', 'CON_HIEU_LUC'}.contains(subscription.trangThai)) {
       return subscription;
     }
   }
   return null;
 });
 
+final activityLogControllerProvider =
+    StateNotifierProvider<ActivityLogController, List<ActivityLog>>((ref) {
+      final repository = ref.watch(greenTrashRepositoryProvider);
+      return ActivityLogController(repository.activityLogs);
+    });
+
+final activityLogsProvider = Provider<List<ActivityLog>>((ref) {
+  return ref.watch(activityLogControllerProvider);
+});
+
+final notificationControllerProvider =
+    StateNotifierProvider<NotificationController, List<AppNotification>>((ref) {
+      final repository = ref.watch(greenTrashRepositoryProvider);
+      return NotificationController(repository.notifications);
+    });
+
 final notificationsProvider = Provider<List<AppNotification>>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return const [];
-  return ref
-      .watch(greenTrashRepositoryProvider)
-      .notifications
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref.watch(firestoreNotificationsProvider(user.userId)).valueOrNull ??
+        const [];
+  }
+  final notifications = ref
+      .watch(notificationControllerProvider)
       .where((notification) => notification.nguoiNhanId == user.userId)
       .toList();
+  notifications.sort((a, b) => b.thoiGian.compareTo(a.thoiGian));
+  return notifications;
 });
 
-final activityLogsProvider = Provider<List<ActivityLog>>((ref) {
-  return ref.watch(greenTrashRepositoryProvider).activityLogs;
+final collectionRecordControllerProvider =
+    StateNotifierProvider<
+      CollectionRecordController,
+      Map<String, CollectionRecord>
+    >((ref) {
+      return CollectionRecordController();
+    });
+
+final collectionRecordProvider = Provider.family<CollectionRecord?, String>((
+  ref,
+  maDon,
+) {
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref.watch(firestoreCollectionRecordProvider(maDon)).valueOrNull;
+  }
+  return ref.watch(collectionRecordControllerProvider)[maDon];
+});
+
+final paymentRecordControllerProvider =
+    StateNotifierProvider<PaymentRecordController, Map<String, PaymentRecord>>((
+      ref,
+    ) {
+      return PaymentRecordController();
+    });
+
+final paymentRecordProvider = Provider.family<PaymentRecord?, String>((
+  ref,
+  maDon,
+) {
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref.watch(firestorePaymentRecordProvider(maDon)).valueOrNull;
+  }
+  return ref.watch(paymentRecordControllerProvider)[maDon];
+});
+
+final orderActivityLogsProvider = Provider.family<List<ActivityLog>, String>((
+  ref,
+  maDon,
+) {
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref.watch(firestoreOrderActivityLogsProvider(maDon)).valueOrNull ??
+        const [];
+  }
+  return ref
+      .watch(activityLogsProvider)
+      .where((log) => log.maDon == maDon)
+      .toList(growable: false);
 });
 
 final timeSlotsProvider = Provider<List<String>>((ref) {
@@ -86,36 +235,107 @@ final orderControllerProvider =
         initialOrders: repository.initialOrders,
         staff: repository.staff,
         addresses: repository.addresses,
+        dispatchMode: OrderDispatchMode.openQueue,
+        addActivityLog: ref.read(activityLogControllerProvider.notifier).add,
+        addNotification: ref.read(notificationControllerProvider.notifier).add,
+        saveCollectionRecord: ref
+            .read(collectionRecordControllerProvider.notifier)
+            .save,
+        savePaymentRecord: ref
+            .read(paymentRecordControllerProvider.notifier)
+            .save,
+        consumeSubscription:
+            ({required String customerId, required double kg}) {
+              ref
+                  .read(subscriptionControllerProvider.notifier)
+                  .consume(customerId: customerId, kg: kg);
+            },
+        readStaffProfiles: () => ref.read(staffProfileControllerProvider),
+        updateStaffStatus: (staffId, status) {
+          ref
+              .read(staffProfileControllerProvider.notifier)
+              .setWorkStatus(staffId, status);
+        },
       );
     });
 
 final customerOrdersProvider = Provider<List<PickupOrder>>((ref) {
   final user = ref.watch(currentUserProvider);
-  final orders = ref.watch(orderControllerProvider);
   if (user == null) return const [];
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref
+            .watch(firestoreCustomerOrdersProvider(user.userId))
+            .valueOrNull ??
+        const [];
+  }
+  final orders = ref.watch(orderControllerProvider);
   return orders.where((order) => order.khachHangId == user.userId).toList()
     ..sort((a, b) => b.ngayTao.compareTo(a.ngayTao));
 });
 
 final staffOrdersProvider = Provider<List<PickupOrder>>((ref) {
   final user = ref.watch(currentUserProvider);
-  final orders = ref.watch(orderControllerProvider);
   if (user == null) return const [];
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref
+            .watch(firestoreStaffOrdersProvider(user.userId))
+            .valueOrNull
+            ?.where(
+              (order) =>
+                  order.trangThai != 'HOAN_THANH' && order.trangThai != 'HUY',
+            )
+            .toList(growable: false) ??
+        const [];
+  }
+  final orders = ref.watch(orderControllerProvider);
   return orders
-      .where((order) => order.nhanVienHienTaiId == user.userId)
+      .where(
+        (order) =>
+            order.nhanVienHienTaiId == user.userId &&
+            order.trangThai != 'HOAN_THANH' &&
+            order.trangThai != 'HUY',
+      )
       .toList()
     ..sort((a, b) => a.ngayThuGom.compareTo(b.ngayThuGom));
 });
 
+final staffOrderHistoryProvider = Provider<List<PickupOrder>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return const [];
+  if (ref.watch(firebaseEnabledProvider)) {
+    final orders = ref
+        .watch(firestoreStaffOrdersProvider(user.userId))
+        .valueOrNull;
+    if (orders == null) return const [];
+    return sortHistoryOrdersNewestFirst(
+      orders.where(
+        (order) => order.trangThai == 'HOAN_THANH' || order.trangThai == 'HUY',
+      ),
+    );
+  }
+  final orders = ref.watch(orderControllerProvider);
+  return sortHistoryOrdersNewestFirst(
+    orders.where(
+      (order) =>
+          order.nhanVienHienTaiId == user.userId &&
+          (order.trangThai == 'HOAN_THANH' || order.trangThai == 'HUY'),
+    ),
+  );
+});
+
 final staffOfferOrdersProvider = Provider<List<PickupOrder>>((ref) {
   final user = ref.watch(currentUserProvider);
-  final orders = ref.watch(orderControllerProvider);
   if (user == null) return const [];
+  if (ref.watch(firebaseEnabledProvider)) {
+    return ref.watch(firestoreOpenOrdersProvider(user.userId)).valueOrNull ??
+        const [];
+  }
+  final orders = ref.watch(orderControllerProvider);
   return orders
       .where(
         (order) =>
             order.trangThai == 'CHO_XU_LY' &&
-            order.nhanVienDeXuatId == user.userId,
+            !order.nhanVienTuChoiIds.contains(user.userId),
       )
       .toList()
     ..sort((a, b) => a.ngayThuGom.compareTo(b.ngayThuGom));
@@ -125,166 +345,3 @@ final adminOrdersProvider = Provider<List<PickupOrder>>((ref) {
   return [...ref.watch(orderControllerProvider)]
     ..sort((a, b) => b.ngayTao.compareTo(a.ngayTao));
 });
-
-class OrderController extends StateNotifier<List<PickupOrder>> {
-  OrderController({
-    required List<PickupOrder> initialOrders,
-    required List<StaffProfile> staff,
-    required List<CustomerAddress> addresses,
-  }) : _staff = staff,
-       _addresses = addresses,
-       super(initialOrders);
-
-  final List<StaffProfile> _staff;
-  final List<CustomerAddress> _addresses;
-
-  PickupOrder createOrder({
-    required String khachHangId,
-    required String diaChiId,
-    required String loaiRacId,
-    required double khoiLuongDuKien,
-    required DateTime ngayThuGom,
-    required String khungGio,
-    required String hinhThucTinhPhi,
-    required String ghiChu,
-  }) {
-    final suggestedStaffId = _nextStaffForAddress(
-      diaChiId,
-      rejectedStaffIds: const [],
-    );
-    final order = PickupOrder(
-      maDon: 'DON_${(state.length + 1).toString().padLeft(3, '0')}',
-      khachHangId: khachHangId,
-      diaChiId: diaChiId,
-      loaiRacId: loaiRacId,
-      nhanVienDeXuatId: suggestedStaffId,
-      khoiLuongDuKien: khoiLuongDuKien,
-      ngayThuGom: ngayThuGom,
-      khungGio: khungGio,
-      hinhThucTinhPhi: hinhThucTinhPhi,
-      trangThai: 'CHO_XU_LY',
-      ghiChu: ghiChu,
-      ngayTao: DateTime.now(),
-    );
-
-    state = [order, ...state];
-    return order;
-  }
-
-  void assignStaff({required String maDon, required String nhanVienId}) {
-    _updateOrder(
-      maDon,
-      (order) => order.copyWith(
-        nhanVienHienTaiId: nhanVienId,
-        clearNhanVienDeXuatId: true,
-        trangThai: 'CHO_NHAN',
-      ),
-    );
-  }
-
-  void acceptOrder(String maDon) {
-    _updateOrder(
-      maDon,
-      (order) => order.copyWith(
-        nhanVienHienTaiId: order.nhanVienHienTaiId ?? order.nhanVienDeXuatId,
-        clearNhanVienDeXuatId: true,
-        trangThai: 'DA_NHAN',
-        gioChot: DateTime.now(),
-      ),
-    );
-  }
-
-  void acceptOffer({required String maDon, required String nhanVienId}) {
-    _updateOrder(maDon, (order) {
-      if (order.nhanVienDeXuatId != nhanVienId ||
-          order.trangThai != 'CHO_XU_LY') {
-        return order;
-      }
-      return order.copyWith(
-        nhanVienHienTaiId: nhanVienId,
-        clearNhanVienDeXuatId: true,
-        trangThai: 'DA_NHAN',
-        gioChot: DateTime.now(),
-      );
-    });
-  }
-
-  void rejectOffer({required String maDon, required String nhanVienId}) {
-    _updateOrder(maDon, (order) {
-      if (order.nhanVienDeXuatId != nhanVienId ||
-          order.trangThai != 'CHO_XU_LY') {
-        return order;
-      }
-
-      final rejected = {...order.nhanVienTuChoiIds, nhanVienId}.toList();
-      final nextStaffId = _nextStaffForAddress(
-        order.diaChiId,
-        rejectedStaffIds: rejected,
-      );
-
-      return order.copyWith(
-        nhanVienDeXuatId: nextStaffId,
-        clearNhanVienDeXuatId: nextStaffId == null,
-        nhanVienTuChoiIds: rejected,
-      );
-    });
-  }
-
-  void updateStatus(String maDon, String status) {
-    _updateOrder(maDon, (order) => order.copyWith(trangThai: status));
-  }
-
-  void completeOrder(String maDon) {
-    _updateOrder(maDon, (order) => order.copyWith(trangThai: 'HOAN_THANH'));
-  }
-
-  void cancelOrder(String maDon) {
-    _updateOrder(maDon, (order) => order.copyWith(trangThai: 'HUY'));
-  }
-
-  void _updateOrder(String maDon, PickupOrder Function(PickupOrder) update) {
-    state = [
-      for (final order in state)
-        if (order.maDon == maDon) update(order) else order,
-    ];
-  }
-
-  String? _nextStaffForAddress(
-    String diaChiId, {
-    required List<String> rejectedStaffIds,
-  }) {
-    final address = _findAddress(diaChiId);
-    final availableStaff = _staff
-        .where(
-          (profile) =>
-              profile.trangThaiLamViec == 'SAN_SANG' &&
-              !rejectedStaffIds.contains(profile.nhanVienId),
-        )
-        .toList();
-
-    if (availableStaff.isEmpty) return null;
-    availableStaff.sort((a, b) {
-      final aSameArea = _sameArea(address, a) ? 0 : 1;
-      final bSameArea = _sameArea(address, b) ? 0 : 1;
-      final areaCompare = aSameArea.compareTo(bSameArea);
-      if (areaCompare != 0) return areaCompare;
-      return a.doanhThuHienTai.compareTo(b.doanhThuHienTai);
-    });
-
-    return availableStaff.first.nhanVienId;
-  }
-
-  CustomerAddress? _findAddress(String diaChiId) {
-    for (final address in _addresses) {
-      if (address.diaChiId == diaChiId) return address;
-    }
-    return null;
-  }
-
-  bool _sameArea(CustomerAddress? address, StaffProfile staff) {
-    if (address == null) return false;
-    return staff.viTriHienTai.toLowerCase().contains(
-      address.quanHuyen.toLowerCase(),
-    );
-  }
-}

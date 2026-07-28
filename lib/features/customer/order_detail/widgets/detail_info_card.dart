@@ -90,6 +90,12 @@ class DetailInfoCard extends StatelessWidget {
               label: 'Nhân viên',
               value: _staffStatusLabel(order, staff),
             ),
+            if (order.gioChot != null)
+              DetailRow(
+                icon: Icons.schedule_outlined,
+                label: 'Giờ đến',
+                value: 'Dự kiến ${_formatTime(order.gioChot!)}',
+              ),
             if (order.ghiChu.isNotEmpty)
               DetailRow(
                 icon: Icons.notes_outlined,
@@ -103,11 +109,15 @@ class DetailInfoCard extends StatelessWidget {
   }
 
   static String _staffStatusLabel(PickupOrder order, StaffProfile? staff) {
-    if (staff == null) return 'Đang tìm nhân viên gần bạn';
+    if (staff == null) return 'Đang chờ nhân viên nhận đơn';
     if (order.nhanVienHienTaiId == null) {
       return 'Đã gửi thông báo đến ${staff.maNhanVien} • ${staff.viTriHienTai}';
     }
     return '${staff.maNhanVien} • ${staff.viTriHienTai}';
+  }
+
+  static String _formatTime(DateTime value) {
+    return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
   }
 }
 

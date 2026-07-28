@@ -20,14 +20,14 @@ StatusStyle orderStatusStyle(String status) {
   return switch (status) {
     'CHO_XU_LY' => const StatusStyle(
       label: 'Chờ xử lý',
-      foreground: AppColors.primaryDark,
-      background: AppColors.surfaceAlt,
+      foreground: AppColors.accent,
+      background: AppColors.accentLight,
       icon: Icons.schedule,
     ),
     'CHO_NHAN' => const StatusStyle(
       label: 'Chờ nhận',
-      foreground: AppColors.primary,
-      background: AppColors.primaryLight,
+      foreground: AppColors.secondary,
+      background: AppColors.secondaryLight,
       icon: Icons.assignment_ind_outlined,
     ),
     'DA_NHAN' => const StatusStyle(
@@ -38,26 +38,26 @@ StatusStyle orderStatusStyle(String status) {
     ),
     'DANG_DEN' => const StatusStyle(
       label: 'Đang đến',
-      foreground: AppColors.deepGreen,
-      background: AppColors.surfaceAlt,
+      foreground: AppColors.secondary,
+      background: AppColors.secondaryLight,
       icon: Icons.local_shipping_outlined,
     ),
     'DA_DEN' => const StatusStyle(
       label: 'Đã đến',
-      foreground: AppColors.deepGreen,
-      background: AppColors.surfaceAlt,
+      foreground: AppColors.support,
+      background: AppColors.supportLight,
       icon: Icons.location_on_outlined,
     ),
     'DANG_CAN_RAC' => const StatusStyle(
       label: 'Đang cân rác',
-      foreground: AppColors.deepGreen,
-      background: AppColors.surfaceAlt,
+      foreground: AppColors.support,
+      background: AppColors.supportLight,
       icon: Icons.scale_outlined,
     ),
     'HOAN_THANH' => const StatusStyle(
       label: 'Hoàn thành',
       foreground: AppColors.success,
-      background: AppColors.accentLight,
+      background: AppColors.primaryLight,
       icon: Icons.verified_outlined,
     ),
     'MAC_DINH' => const StatusStyle(
@@ -68,7 +68,7 @@ StatusStyle orderStatusStyle(String status) {
     ),
     'HUY' => const StatusStyle(
       label: 'Đã hủy',
-      foreground: AppColors.error,
+      foreground: AppColors.slate,
       background: AppColors.surfaceAlt,
       icon: Icons.cancel_outlined,
     ),

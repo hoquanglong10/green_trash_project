@@ -39,8 +39,10 @@ class AdminDashboardScreen extends ConsumerWidget {
       actions: [
         IconButton(
           tooltip: 'Đăng xuất',
-          onPressed: () =>
-              ref.read(currentSessionProvider.notifier).state = null,
+          onPressed: () async {
+            await ref.read(firebaseAuthenticationServiceProvider).signOut();
+            ref.read(currentSessionProvider.notifier).state = null;
+          },
           icon: const Icon(Icons.logout),
         ),
       ],

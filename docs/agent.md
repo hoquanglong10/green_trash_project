@@ -12,8 +12,11 @@ For data, business-flow, or Firebase work, read these before editing:
 2. `docs/Documentation/Firestore_Data_Audit.md`
 3. `lib/schema_contract.dart`
 4. `docs/screens/order-flow.md`
+5. `docs/backend-order-workflow.md`
 
-The audited uppercase Firestore schema is authoritative. The current app flow is mocked and must not be described as a live backend.
+The audited uppercase Firestore schema is authoritative. The visible app flow
+is still mocked; the Spark-compatible open-order adapter exists but must not be
+described as live until Auth/provider activation and deployment are verified.
 
 ## Default prompt for UI work
 

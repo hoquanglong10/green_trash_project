@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
+import 'data/firebase_authentication_service.dart';
 import '../../models/app_models.dart';
 import '../../providers/app_providers.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -12,13 +13,51 @@ import '../admin/admin_dashboard_screen.dart';
 import '../customer/customer_home_screen.dart';
 import '../staff/staff_home_screen.dart';
 
-class AuthGate extends ConsumerWidget {
+class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends ConsumerState<AuthGate> {
+  bool _restoring = true;
+  String? _restoreError;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_restoreSession);
+  }
+
+  Future<void> _restoreSession() async {
+    if (!ref.read(firebaseEnabledProvider)) {
+      if (mounted) setState(() => _restoring = false);
+      return;
+    }
+    try {
+      final session = await ref
+          .read(firebaseAuthenticationServiceProvider)
+          .restoreSession();
+      if (mounted) {
+        ref.read(currentSessionProvider.notifier).state = session;
+      }
+    } on AuthenticationException catch (error) {
+      await ref.read(firebaseAuthenticationServiceProvider).signOut();
+      if (mounted) _restoreError = error.message;
+    } finally {
+      if (mounted) setState(() => _restoring = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(currentSessionProvider);
-    if (session == null) return const LoginScreen();
+    final firebaseEnabled = ref.watch(firebaseEnabledProvider);
+    if (_restoring && firebaseEnabled) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (session == null) return LoginScreen(initialMessage: _restoreError);
 
     return switch (session.role) {
       UserRole.customer => const CustomerHomeScreen(),
@@ -29,20 +68,41 @@ class AuthGate extends ConsumerWidget {
 }
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.initialMessage});
+
+  final String? initialMessage;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  UserRole _selectedRole = UserRole.customer;
-  String _selectedUserId = 'USER_KH_001';
+  static const _testAccounts = <_TestAccount>[
+    _TestAccount(
+      label: 'Admin',
+      email: 'admin@greentrash.vn',
+      password: 'Admin@123456',
+      icon: Icons.admin_panel_settings_outlined,
+    ),
+    _TestAccount(
+      label: 'Nhân viên',
+      email: 'nhanvien01@greentrash.vn',
+      password: 'Nhanvien@123456',
+      icon: Icons.badge_outlined,
+    ),
+    _TestAccount(
+      label: 'Khách hàng',
+      email: 'khachhang01@gmail.com',
+      password: 'Khachhang@123456',
+      icon: Icons.person_outline,
+    ),
+  ];
+
   bool _rememberMe = true;
-  final _emailController = TextEditingController(
-    text: 'customer@greentrash.vn',
-  );
-  final _passwordController = TextEditingController(text: 'password');
+  bool _submitting = false;
+  String? _selectedTestEmail;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
@@ -53,12 +113,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final users = ref.watch(usersProvider);
-    final roleUsers = users
-        .where((item) => item.role == _selectedRole)
-        .toList();
-    final selectedUser = _selectedDemoUser(roleUsers);
-
     return AuthScaffold(
       title: '',
       subtitle: '',
@@ -67,6 +121,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           const Center(child: BrandLogo(stacked: true, logoSize: 200)),
           const SizedBox(height: AppSpacing.xxl),
+          if (widget.initialMessage != null) ...[
+            Text(
+              widget.initialMessage!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.warning),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           AppTextInput(
             controller: _emailController,
             icon: Icons.mail_outline,
@@ -123,46 +186,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Text('Vai trò demo', style: Theme.of(context).textTheme.labelMedium),
+          Text(
+            'Tài khoản test',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: AuthRefColors.controlText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: AppSpacing.sm),
-          _RoleSelector(
-            selectedRole: _selectedRole,
-            onChanged: (role) {
-              final user = users.firstWhere((item) => item.role == role);
+          _TestAccountSelector(
+            accounts: _testAccounts,
+            selectedEmail: _selectedTestEmail,
+            onSelected: (account) {
               setState(() {
-                _selectedRole = role;
-                _selectedUserId = user.userId;
-                _emailController.text = user.email;
+                _selectedTestEmail = account.email;
+                _emailController.text = account.email;
+                _passwordController.text = account.password;
               });
             },
           ),
-          if (roleUsers.length > 1) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Tài khoản demo',
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _DemoAccountSelector(
-              users: roleUsers,
-              selectedUserId: selectedUser.userId,
-              onChanged: (user) {
-                setState(() {
-                  _selectedUserId = user.userId;
-                  _emailController.text = user.email;
-                });
-              },
-            ),
-          ],
           const SizedBox(height: AppSpacing.buttonTopGap),
           PrimaryActionButton(
-            label: 'Đăng nhập',
-            onPressed: () {
-              ref.read(currentSessionProvider.notifier).state = AppSession(
-                user: selectedUser,
-                role: selectedUser.role,
-              );
-            },
+            label: _submitting ? 'Dang dang nhap...' : 'Đăng nhập',
+            onPressed: _submitting ? null : _submit,
           ),
           const SizedBox(height: AppSpacing.lg),
           const DividerLabel(label: 'Hoặc'),
@@ -204,28 +250,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  AppUser _selectedDemoUser(List<AppUser> roleUsers) {
-    for (final user in roleUsers) {
-      if (user.userId == _selectedUserId) return user;
+  Future<void> _submit() async {
+    setState(() => _submitting = true);
+    try {
+      final session = await ref
+          .read(firebaseAuthenticationServiceProvider)
+          .signIn(
+            email: _emailController.text,
+            password: _passwordController.text,
+          );
+      if (mounted) {
+        ref.read(currentSessionProvider.notifier).state = session;
+      }
+    } on AuthenticationException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
-    return roleUsers.first;
   }
 }
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _acceptedTerms = true;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -311,8 +374,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: AppSpacing.buttonTopGap),
           PrimaryActionButton(
-            label: 'Đăng ký',
-            onPressed: _acceptedTerms ? () => Navigator.pop(context) : null,
+            label: _submitting ? 'Dang tao tai khoan...' : 'Đăng ký',
+            onPressed: _acceptedTerms && !_submitting ? _register : null,
           ),
           const SizedBox(height: AppSpacing.md),
           Row(
@@ -332,16 +395,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+
+  Future<void> _register() async {
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mat khau nhap lai chua khop.')),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final session = await ref
+          .read(firebaseAuthenticationServiceProvider)
+          .registerCustomer(
+            fullName: _nameController.text,
+            phone: _phoneController.text,
+            email: _emailController.text,
+            password: _passwordController.text,
+          );
+      if (mounted) {
+        ref.read(currentSessionProvider.notifier).state = session;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } on AuthenticationException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 }
 
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
 
   @override
@@ -374,17 +470,29 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: AppSpacing.buttonTopGap),
-          PrimaryActionButton(
-            label: 'Xác nhận',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const VerifyOtpScreen()),
-              );
-            },
-          ),
+          PrimaryActionButton(label: 'Xác nhận', onPressed: _sendResetEmail),
         ],
       ),
     );
+  }
+
+  Future<void> _sendResetEmail() async {
+    try {
+      await ref
+          .read(firebaseAuthenticationServiceProvider)
+          .sendPasswordResetEmail(_emailController.text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Da gui email dat lai mat khau.')),
+      );
+      Navigator.of(context).pop();
+    } on AuthenticationException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
   }
 }
 
@@ -687,6 +795,108 @@ class _FacebookLogo extends StatelessWidget {
   }
 }
 
+class _TestAccount {
+  const _TestAccount({
+    required this.label,
+    required this.email,
+    required this.password,
+    required this.icon,
+  });
+
+  final String label;
+  final String email;
+  final String password;
+  final IconData icon;
+}
+
+class _TestAccountSelector extends StatelessWidget {
+  const _TestAccountSelector({
+    required this.accounts,
+    required this.selectedEmail,
+    required this.onSelected,
+  });
+
+  final List<_TestAccount> accounts;
+  final String? selectedEmail;
+  final ValueChanged<_TestAccount> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var index = 0; index < accounts.length; index++) ...[
+          Expanded(
+            child: _TestAccountButton(
+              account: accounts[index],
+              selected: accounts[index].email == selectedEmail,
+              onTap: () => onSelected(accounts[index]),
+            ),
+          ),
+          if (index < accounts.length - 1) const SizedBox(width: AppSpacing.sm),
+        ],
+      ],
+    );
+  }
+}
+
+class _TestAccountButton extends StatelessWidget {
+  const _TestAccountButton({
+    required this.account,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _TestAccount account;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Điền tài khoản test ${account.label}',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onTap,
+        child: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: selected
+                ? AuthRefColors.controlSelectedSurface
+                : AuthRefColors.controlSurface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: selected
+                  ? AuthRefColors.controlSelectedBorder
+                  : AuthRefColors.controlBorder,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(account.icon, size: 16, color: AuthRefColors.controlIcon),
+              const SizedBox(width: AppSpacing.xs),
+              Flexible(
+                child: Text(
+                  account.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: selected
+                        ? AppColors.text
+                        : AuthRefColors.controlText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
 class _RoleSelector extends StatelessWidget {
   const _RoleSelector({required this.selectedRole, required this.onChanged});
 
@@ -780,6 +990,7 @@ class _RolePill extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _DemoAccountSelector extends StatelessWidget {
   const _DemoAccountSelector({
     required this.users,

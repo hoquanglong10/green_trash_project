@@ -2,14 +2,14 @@
   "metadata": {
     "title": "GreenTrash Firestore Schema Contract",
     "database": "greentrashdb",
-    "generatedAt": "2026-07-14",
+    "generatedAt": "2026-07-28",
     "sourceOfTruth": [
       "lib/schema_contract.dart",
       "docs/Documentation/Firestore_Data_Audit.md"
     ],
     "collectionNaming": "Uppercase Vietnamese identifiers; collection names are case-sensitive.",
-    "runtimeStatus": "The Flutter app currently uses mock in-memory data. This file describes the audited Firestore contract, not data currently written by the app.",
-    "rulesWarning": "The current firestore.rules file uses an old lower_snake_case schema and must not be deployed until migrated."
+    "runtimeStatus": "The visible Flutter UI uses an open-queue mock flow. A Spark-compatible Firestore open-order repository and rules are prepared but not yet activated in the UI.",
+    "rulesWarning": "Deploy firestore.rules and firestore.indexes.json together only after reviewing the classroom open-queue migration."
   },
   "fieldTypes": [
     "string",
@@ -50,7 +50,15 @@
       "08-10"
     ],
     "feeTypes": ["GOI_THANG", "THEO_KG"],
-    "assignmentStatuses": ["CHO_NHAN", "DA_NHAN", "TU_CHOI", "HUY"],
+    "assignmentSources": ["HE_THONG", "ADMIN"],
+    "assignmentStatuses": [
+      "CHO_PHAN_HOI",
+      "DA_NHAN",
+      "TU_CHOI",
+      "HET_HAN",
+      "HUY",
+      "CHO_NHAN"
+    ],
     "packageStatuses": [
       "CHO_THANH_TOAN",
       "CON_HIEU_LUC",
@@ -87,13 +95,15 @@
     "One audited DON_THU_GOM document uses khungGio = 08-10; the canonical format is 08:00-10:00.",
     "A package may use CON_HL in place of CON_HIEU_LUC.",
     "A payment may use DA_TT in place of DA_THANH_TOAN.",
-    "One payment stores GOI_THANG in phuongThuc although it is a fee type, not a normal payment method."
+    "One payment stores GOI_THANG in phuongThuc although it is a fee type, not a normal payment method.",
+    "CHO_NHAN is retained for manual admin assignment. Classroom open-queue claims write DA_NHAN directly."
   ],
-  "directOfferMigrationGap": {
-    "description": "The current mock order flow has nhanVienDeXuatId and nhanVienTuChoiIds, but those fields are not in the audited DON_THU_GOM contract.",
+  "openQueuePersistence": {
+    "description": "Classroom mode exposes CHO_XU_LY orders to active staff. The first atomic claim wins. PHAN_CONG_THU_GOM records acceptance or rejection, while DON_THU_GOM stores rejected staff IDs for simple per-staff filtering.",
     "affectedCollections": ["DON_THU_GOM", "PHAN_CONG_THU_GOM"],
-    "currentLimitation": "PHAN_CONG_THU_GOM.adminId is required, so it cannot represent a system-created staff offer without a schema migration.",
-    "requiredBeforeBackendImplementation": "Approve one persistence design, then update this JSON file, schema_contract.dart, repository mappers, indexes, Firestore Rules, Cloud Functions, and tests together."
+    "systemOfferRule": "nguonPhanCong is HE_THONG and adminId is omitted for a staff claim or rejection in classroom mode.",
+    "adminOfferRule": "nguonPhanCong is ADMIN and adminId is required.",
+    "acceptedStaffRule": "nhanVienHienTaiId is null until a staff member atomically accepts the order; only the first transaction succeeds."
   },
   "collections": [
     {
@@ -141,7 +151,11 @@
         "gioBatDau": {"type": "string", "required": true},
         "gioKetThuc": {"type": "string", "required": true},
         "doanhThuHienTai": {"type": "number", "required": false},
-        "viTriHienTai": {"type": "string", "required": false}
+        "viTriHienTai": {"type": "string", "required": false},
+        "toaDoLat": {"type": "number", "required": false},
+        "toaDoLng": {"type": "number", "required": false},
+        "capNhatViTriLuc": {"type": "timestamp", "required": false},
+        "phanCongDangChoId": {"type": "string", "required": false}
       }
     },
     {
@@ -219,7 +233,8 @@
         "soKgConLai": {"type": "number", "required": true},
         "trangThai": {"type": "string", "required": true, "allowedValues": "packageStatuses"},
         "ngayDangKy": {"type": "timestamp", "required": true},
-        "ngayHetHan": {"type": "timestamp", "required": false}
+        "ngayHetHan": {"type": "timestamp", "required": false},
+        "maDonCapNhatCuoi": {"type": "string", "required": false}
       }
     },
     {
@@ -231,6 +246,10 @@
         "diaChiId": {"type": "string", "required": true},
         "loaiRacId": {"type": "string", "required": true},
         "nhanVienHienTaiId": {"type": "string", "required": false},
+        "phanCongHienTaiId": {"type": "string", "required": false},
+        "nhanVienTuChoiIds": {"type": "stringArray", "required": false},
+        "soLanDeXuat": {"type": "number", "required": false},
+        "dangChoHoTro": {"type": "boolean", "required": false},
         "khoiLuongDuKien": {"type": "number", "required": true},
         "ngayThuGom": {"type": "timestamp", "required": true},
         "khungGio": {"type": "string", "required": true, "allowedValues": "timeSlots"},
@@ -238,7 +257,13 @@
         "hinhThucTinhPhi": {"type": "string", "required": true, "allowedValues": "feeTypes"},
         "trangThai": {"type": "string", "required": true, "allowedValues": "orderStatuses"},
         "ghiChu": {"type": "string", "required": false},
-        "ngayTao": {"type": "timestamp", "required": true}
+        "ngayTao": {"type": "timestamp", "required": true},
+        "ngayCapNhat": {"type": "timestamp", "required": false},
+        "daThongBaoNhanVienSapDen": {"type": "boolean", "required": false},
+        "daThongBaoNhanVienDaDen": {"type": "boolean", "required": false},
+        "lyDoHuy": {"type": "string", "required": false},
+        "bienBanId": {"type": "string", "required": false},
+        "thanhToanId": {"type": "string", "required": false}
       }
     },
     {
@@ -248,10 +273,15 @@
         "phanCongId": {"type": "string", "required": true},
         "maDon": {"type": "string", "required": true},
         "nhanVienId": {"type": "string", "required": true},
-        "adminId": {"type": "string", "required": true},
+        "adminId": {"type": "string", "required": false},
+        "nguonPhanCong": {"type": "string", "required": true, "allowedValues": "assignmentSources"},
         "trangThaiPhanCong": {"type": "string", "required": true, "allowedValues": "assignmentStatuses"},
         "thoiGianPhanCong": {"type": "timestamp", "required": true},
-        "lyDoTuChoi": {"type": "string", "required": false}
+        "thoiGianHetHan": {"type": "timestamp", "required": true},
+        "thuTuDeXuat": {"type": "number", "required": true},
+        "thoiGianPhanHoi": {"type": "timestamp", "required": false},
+        "lyDoTuChoi": {"type": "string", "required": false},
+        "ngayCapNhat": {"type": "timestamp", "required": false}
       }
     },
     {
@@ -264,6 +294,7 @@
         "loaiRacThucTeId": {"type": "string", "required": true},
         "khoiLuongThucTe": {"type": "number", "required": true},
         "anhXacNhanUrl": {"type": "string", "required": false},
+        "anhXacNhanBytes": {"type": "bytes", "required": false},
         "phiPhaiTra": {"type": "number", "required": true},
         "trangThaiThanhToan": {"type": "string", "required": true, "allowedValues": "paymentStatuses"},
         "thoiGianLap": {"type": "timestamp", "required": true}

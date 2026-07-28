@@ -7,183 +7,765 @@ service cloud.firestore {
     }
 
     function userPath() {
-      return /databases/$(database)/documents/users/$(request.auth.uid);
+      return /databases/$(database)/documents/NGUOI_DUNG/$(request.auth.uid);
     }
 
-    function userDocExists() {
-      return isSignedIn() && exists(userPath());
+    function orderPath(maDon) {
+      return /databases/$(database)/documents/DON_THU_GOM/$(maDon);
     }
 
-    function userDoc() {
-      return get(userPath()).data;
+    function staffPath(staffId) {
+      return /databases/$(database)/documents/NHAN_VIEN_THU_GOM/$(staffId);
     }
 
-    // Development bootstrap account. Use this only to create/repair the first
-    // admin profile, then you can remove this function/branch if desired.
-    function isBootstrapAdmin() {
-      return isSignedIn() && request.auth.token.email == 'admin@greentrash.vn';
+    function assignmentPath(phanCongId) {
+      return /databases/$(database)/documents/PHAN_CONG_THU_GOM/$(phanCongId);
+    }
+
+    function recordPath(bienBanId) {
+      return /databases/$(database)/documents/BIEN_BAN_THU_GOM/$(bienBanId);
+    }
+
+    function hasActiveProfile() {
+      return isSignedIn()
+        && exists(userPath())
+        && get(userPath()).data.trangThai == 'ACTIVE';
+    }
+
+    function hasRole(roleId) {
+      return hasActiveProfile() && get(userPath()).data.roleId == roleId;
     }
 
     function isAdmin() {
-      return userDocExists() && userDoc().role == 'ADMIN';
+      return hasRole('ADMIN');
     }
 
-    function isNhanVien() {
-      return userDocExists() && userDoc().role == 'NHAN_VIEN';
+    function isCustomer() {
+      return hasRole('CUSTOMER');
     }
 
-    function isKhachHang() {
-      return userDocExists() && userDoc().role == 'KHACH_HANG';
+    function isStaff() {
+      return hasRole('STAFF');
     }
 
-    function isActive() {
-      return userDocExists() && userDoc().trangThai == 'ACTIVE';
+    function isAvailableStaff() {
+      return isStaff()
+        && exists(staffPath(request.auth.uid))
+        && get(staffPath(request.auth.uid)).data.trangThaiLamViec
+          in ['SAN_SANG', 'DANG_RANH'];
     }
 
-    function isOwner(userId) {
+    function isSelf(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    match /users/{userId} {
-      allow read: if isOwner(userId) || (isActive() && isAdmin());
-      allow create: if isSignedIn() && isOwner(userId) && (
-        request.resource.data.role == 'KHACH_HANG' ||
-        (
-          isBootstrapAdmin() &&
-          request.resource.data.role == 'ADMIN' &&
-          request.resource.data.trangThai == 'ACTIVE'
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(fields);
+    }
+
+    function isTrueIfChanged(field) {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny([field])
+        || (
+          request.resource.data.keys().hasAny([field])
+          && request.resource.data[field] == true
+        );
+    }
+
+    function isWaitingAssignment(data) {
+      return data.trangThaiPhanCong in ['CHO_PHAN_HOI', 'CHO_NHAN'];
+    }
+
+    function isOfferedStaff(orderData) {
+      return isStaff()
+        && 'phanCongHienTaiId' in orderData
+        && exists(assignmentPath(orderData.phanCongHienTaiId))
+        && get(assignmentPath(orderData.phanCongHienTaiId)).data.nhanVienId
+          == request.auth.uid;
+    }
+
+    function isAssignedStaff(orderData) {
+      return isStaff()
+        && 'nhanVienHienTaiId' in orderData
+        && orderData.nhanVienHienTaiId == request.auth.uid;
+    }
+
+    function rejectedStaffIds(orderData) {
+      return 'nhanVienTuChoiIds' in orderData
+        ? orderData.nhanVienTuChoiIds
+        : [];
+    }
+
+    function canReadOrder(orderData) {
+      return isAdmin()
+        || (isCustomer() && orderData.khachHangId == request.auth.uid)
+        || isAssignedStaff(orderData)
+        || isOfferedStaff(orderData)
+        || (isStaff() && orderData.trangThai == 'CHO_XU_LY');
+    }
+
+    function canActOnOrder(orderData) {
+      return (isCustomer() && orderData.khachHangId == request.auth.uid)
+        || isAssignedStaff(orderData)
+        || isOfferedStaff(orderData)
+        || (
+          isStaff()
+          && orderData.trangThai == 'CHO_XU_LY'
+          && rejectedStaffIds(orderData).hasAny([request.auth.uid])
+        );
+    }
+
+    function validCustomerOrderCreate(maDon) {
+      return isCustomer()
+        && request.resource.data.keys().hasAll([
+          'maDon',
+          'khachHangId',
+          'diaChiId',
+          'loaiRacId',
+          'khoiLuongDuKien',
+          'ngayThuGom',
+          'khungGio',
+          'hinhThucTinhPhi',
+          'trangThai',
+          'ghiChu',
+          'nhanVienTuChoiIds',
+          'soLanDeXuat',
+          'dangChoHoTro',
+          'ngayTao',
+          'ngayCapNhat'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'maDon',
+          'khachHangId',
+          'diaChiId',
+          'loaiRacId',
+          'khoiLuongDuKien',
+          'ngayThuGom',
+          'khungGio',
+          'hinhThucTinhPhi',
+          'trangThai',
+          'ghiChu',
+          'nhanVienTuChoiIds',
+          'soLanDeXuat',
+          'dangChoHoTro',
+          'ngayTao',
+          'ngayCapNhat'
+        ])
+        && request.resource.data.maDon == maDon
+        && request.resource.data.khachHangId == request.auth.uid
+        && request.resource.data.khoiLuongDuKien is number
+        && request.resource.data.khoiLuongDuKien > 0
+        && request.resource.data.ngayThuGom is timestamp
+        && request.resource.data.trangThai == 'CHO_XU_LY'
+        && request.resource.data.nhanVienTuChoiIds is list
+        && request.resource.data.nhanVienTuChoiIds.size() == 0
+        && request.resource.data.soLanDeXuat == 0
+        && request.resource.data.dangChoHoTro == false;
+    }
+
+    function customerCancelsOrder() {
+      return isCustomer()
+        && resource.data.khachHangId == request.auth.uid
+        && resource.data.trangThai in [
+          'CHO_XU_LY',
+          'CHO_NHAN',
+          'DA_NHAN',
+          'DANG_DEN'
+        ]
+        && request.resource.data.trangThai == 'HUY'
+        && request.resource.data.lyDoHuy is string
+        && request.resource.data.lyDoHuy.size() > 0
+        && onlyChanges([
+          'trangThai',
+          'lyDoHuy',
+          'dangChoHoTro',
+          'ngayCapNhat'
+        ]);
+    }
+
+    function staffAcceptsOffer() {
+      return isOfferedStaff(resource.data)
+        && resource.data.trangThai == 'CHO_XU_LY'
+        && request.resource.data.trangThai == 'DA_NHAN'
+        && request.resource.data.nhanVienHienTaiId == request.auth.uid
+        && request.resource.data.phanCongHienTaiId
+          == resource.data.phanCongHienTaiId
+        && getAfter(
+          assignmentPath(resource.data.phanCongHienTaiId)
+        ).data.trangThaiPhanCong == 'DA_NHAN'
+        && onlyChanges([
+          'nhanVienHienTaiId',
+          'gioChot',
+          'trangThai',
+          'dangChoHoTro',
+          'ngayCapNhat'
+        ]);
+    }
+
+    function staffClaimsOpenOrder() {
+      return isAvailableStaff()
+        && resource.data.trangThai == 'CHO_XU_LY'
+        && !rejectedStaffIds(resource.data).hasAny([request.auth.uid])
+        && (
+          !('nhanVienHienTaiId' in resource.data)
+          || resource.data.nhanVienHienTaiId == null
         )
-      );
-      allow update: if isSignedIn() && (
-        (isActive() && (isOwner(userId) || isAdmin())) ||
-        (
-          isOwner(userId) &&
-          isBootstrapAdmin() &&
-          request.resource.data.role == 'ADMIN' &&
-          request.resource.data.trangThai == 'ACTIVE'
-        )
-      );
-      allow delete: if false;
+        && request.resource.data.trangThai == 'DA_NHAN'
+        && request.resource.data.nhanVienHienTaiId == request.auth.uid
+        && request.resource.data.phanCongHienTaiId is string
+        && request.resource.data.gioChot is timestamp
+        && getAfter(
+          assignmentPath(request.resource.data.phanCongHienTaiId)
+        ).data.phanCongId == request.resource.data.phanCongHienTaiId
+        && getAfter(
+          assignmentPath(request.resource.data.phanCongHienTaiId)
+        ).data.nhanVienId == request.auth.uid
+        && getAfter(
+          assignmentPath(request.resource.data.phanCongHienTaiId)
+        ).data.trangThaiPhanCong == 'DA_NHAN'
+        && onlyChanges([
+          'nhanVienHienTaiId',
+          'phanCongHienTaiId',
+          'gioChot',
+          'trangThai',
+          'soLanDeXuat',
+          'dangChoHoTro',
+          'ngayCapNhat'
+        ]);
     }
 
-    match /dia_chi/{diaChiId} {
-      allow read: if isActive() &&
-        (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isActive() && isKhachHang() &&
-        request.resource.data.userId == request.auth.uid;
-      allow update: if isActive() &&
-        (resource.data.userId == request.auth.uid || isAdmin());
-      allow delete: if isActive() && resource.data.userId == request.auth.uid;
+    function staffDismissesOpenOrder() {
+      let oldRejected = rejectedStaffIds(resource.data);
+      let newRejected = rejectedStaffIds(request.resource.data);
+      return isStaff()
+        && resource.data.trangThai == 'CHO_XU_LY'
+        && request.resource.data.trangThai == 'CHO_XU_LY'
+        && !oldRejected.hasAny([request.auth.uid])
+        && newRejected.hasAll(oldRejected)
+        && newRejected.hasAny([request.auth.uid])
+        && newRejected.size() == oldRejected.size() + 1
+        && request.resource.data.soLanDeXuat
+          == resource.data.soLanDeXuat + 1
+        && onlyChanges([
+          'nhanVienTuChoiIds',
+          'soLanDeXuat',
+          'ngayCapNhat'
+        ]);
     }
 
-    match /loai_rac/{loaiRacId} {
-      allow read: if true;
-      allow create, update, delete: if isActive() && isAdmin();
+    function staffUpdatesArrival() {
+      return isAssignedStaff(resource.data)
+        && resource.data.trangThai in ['DA_NHAN', 'DANG_DEN']
+        && request.resource.data.trangThai == resource.data.trangThai
+        && request.resource.data.gioChot is timestamp
+        && onlyChanges(['gioChot', 'ngayCapNhat']);
     }
 
-    match /dich_vu_gia_bieu/{bangGiaId} {
-      allow read: if true;
-      allow create, update, delete: if isActive() && isAdmin();
-    }
-
-    match /goi_thu_gom/{goiId} {
-      allow read: if true;
-      allow create, update, delete: if isActive() && isAdmin();
-    }
-
-    match /dang_ky_goi/{dangKyGoiId} {
-      allow read: if isActive() &&
-        (isAdmin() || resource.data.khachHangId == request.auth.uid);
-      allow create: if isActive() && isKhachHang() &&
-        request.resource.data.khachHangId == request.auth.uid;
-      allow update: if isActive() && isAdmin();
-      allow delete: if false;
-    }
-
-    match /don_thu_gom/{maDon} {
-      allow create: if isActive() && isKhachHang() &&
-        request.resource.data.khachHangId == request.auth.uid &&
-        request.resource.data.trangThai in ['CHO_XU_LY', 'CHO_PHAN_CONG'];
-
-      allow read: if isActive() && (
-        isAdmin() ||
-        resource.data.khachHangId == request.auth.uid ||
-        resource.data.nhanVienId == request.auth.uid
-      );
-
-      allow update: if isActive() && (
-        isAdmin() ||
-        (isKhachHang() && resource.data.khachHangId == request.auth.uid) ||
-        (
-          isNhanVien() &&
+    function staffTransitionsOrder() {
+      return isAssignedStaff(resource.data)
+        && (
           (
-            resource.data.nhanVienId == request.auth.uid ||
-            resource.data.nhanVienId == null
+            resource.data.trangThai == 'DA_NHAN'
+            && request.resource.data.trangThai == 'DANG_DEN'
+          )
+          || (
+            resource.data.trangThai == 'DANG_DEN'
+            && request.resource.data.trangThai == 'DA_DEN'
+          )
+          || (
+            resource.data.trangThai == 'DA_DEN'
+            && request.resource.data.trangThai == 'DANG_CAN_RAC'
           )
         )
-      );
+        && onlyChanges(['trangThai', 'ngayCapNhat']);
+    }
 
+    function staffMarksProximityNotifications() {
+      return isAssignedStaff(resource.data)
+        && resource.data.trangThai == 'DANG_DEN'
+        && request.resource.data.trangThai == 'DANG_DEN'
+        && onlyChanges([
+          'daThongBaoNhanVienSapDen',
+          'daThongBaoNhanVienDaDen',
+          'ngayCapNhat'
+        ])
+        && isTrueIfChanged('daThongBaoNhanVienSapDen')
+        && isTrueIfChanged('daThongBaoNhanVienDaDen');
+    }
+
+    function staffCompletesOrder() {
+      return isAssignedStaff(resource.data)
+        && resource.data.trangThai == 'DANG_CAN_RAC'
+        && request.resource.data.trangThai == 'HOAN_THANH'
+        && request.resource.data.bienBanId is string
+        && request.resource.data.thanhToanId is string
+        && onlyChanges([
+          'trangThai',
+          'bienBanId',
+          'thanhToanId',
+          'ngayCapNhat'
+        ]);
+    }
+
+    function staffCancelsOrder() {
+      return isAssignedStaff(resource.data)
+        && !(resource.data.trangThai in ['HOAN_THANH', 'HUY'])
+        && request.resource.data.trangThai == 'HUY'
+        && request.resource.data.lyDoHuy is string
+        && request.resource.data.lyDoHuy.size() > 0
+        && onlyChanges([
+          'trangThai',
+          'lyDoHuy',
+          'dangChoHoTro',
+          'ngayCapNhat'
+        ]);
+    }
+
+    function staffRespondsToAssignment() {
+      return isStaff()
+        && resource.data.nhanVienId == request.auth.uid
+        && isWaitingAssignment(resource.data)
+        && request.resource.data.nhanVienId == resource.data.nhanVienId
+        && request.resource.data.maDon == resource.data.maDon
+        && request.resource.data.phanCongId == resource.data.phanCongId
+        && (
+          (
+            request.resource.data.trangThaiPhanCong == 'DA_NHAN'
+            && getAfter(orderPath(resource.data.maDon)).data.trangThai
+              == 'DA_NHAN'
+            && getAfter(orderPath(resource.data.maDon))
+              .data.nhanVienHienTaiId == request.auth.uid
+          )
+          || (
+            request.resource.data.trangThaiPhanCong == 'TU_CHOI'
+            && request.resource.data.lyDoTuChoi is string
+            && request.resource.data.lyDoTuChoi.size() > 0
+            && getAfter(orderPath(resource.data.maDon)).data.trangThai
+              == 'CHO_XU_LY'
+          )
+        )
+        && onlyChanges([
+          'trangThaiPhanCong',
+          'thoiGianPhanHoi',
+          'lyDoTuChoi',
+          'ngayCapNhat'
+        ]);
+    }
+
+    function staffCreatesOpenAssignment(assignmentId) {
+      let order = getAfter(
+        orderPath(request.resource.data.maDon)
+      ).data;
+      return isStaff()
+        && request.resource.data.keys().hasAll([
+          'phanCongId',
+          'maDon',
+          'nhanVienId',
+          'nguonPhanCong',
+          'trangThaiPhanCong',
+          'thoiGianPhanCong',
+          'thoiGianHetHan',
+          'thuTuDeXuat',
+          'thoiGianPhanHoi',
+          'ngayCapNhat'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'phanCongId',
+          'maDon',
+          'nhanVienId',
+          'nguonPhanCong',
+          'trangThaiPhanCong',
+          'thoiGianPhanCong',
+          'thoiGianHetHan',
+          'thuTuDeXuat',
+          'thoiGianPhanHoi',
+          'lyDoTuChoi',
+          'ngayCapNhat'
+        ])
+        && request.resource.data.phanCongId == assignmentId
+        && request.resource.data.nhanVienId == request.auth.uid
+        && request.resource.data.nguonPhanCong == 'HE_THONG'
+        && request.resource.data.thoiGianPhanCong is timestamp
+        && request.resource.data.thoiGianHetHan is timestamp
+        && request.resource.data.thoiGianPhanHoi is timestamp
+        && request.resource.data.thuTuDeXuat is int
+        && request.resource.data.thuTuDeXuat > 0
+        && (
+          (
+            request.resource.data.trangThaiPhanCong == 'DA_NHAN'
+            && order.trangThai == 'DA_NHAN'
+            && order.nhanVienHienTaiId == request.auth.uid
+            && order.phanCongHienTaiId == assignmentId
+          )
+          || (
+            request.resource.data.trangThaiPhanCong == 'TU_CHOI'
+            && request.resource.data.lyDoTuChoi is string
+            && request.resource.data.lyDoTuChoi.size() > 0
+            && order.trangThai == 'CHO_XU_LY'
+            && rejectedStaffIds(order).hasAny([request.auth.uid])
+          )
+        );
+    }
+
+    function customerCancelsAssignment() {
+      return isCustomer()
+        && isWaitingAssignment(resource.data)
+        && get(orderPath(resource.data.maDon)).data.khachHangId
+          == request.auth.uid
+        && getAfter(orderPath(resource.data.maDon)).data.trangThai == 'HUY'
+        && request.resource.data.trangThaiPhanCong == 'HUY'
+        && onlyChanges([
+          'trangThaiPhanCong',
+          'thoiGianPhanHoi',
+          'ngayCapNhat'
+        ]);
+    }
+
+    function staffCreatesCompletionRecord(bienBanId) {
+      let order = getAfter(orderPath(request.resource.data.maDon)).data;
+      return isStaff()
+        && request.resource.data.bienBanId == bienBanId
+        && request.resource.data.nhanVienId == request.auth.uid
+        && request.resource.data.khoiLuongThucTe is number
+        && request.resource.data.khoiLuongThucTe > 0
+        && order.nhanVienHienTaiId == request.auth.uid
+        && order.trangThai == 'HOAN_THANH'
+        && order.bienBanId == bienBanId;
+    }
+
+    function staffCreatesPayment(thanhToanId) {
+      let order = getAfter(orderPath(request.resource.data.maDon)).data;
+      return isStaff()
+        && request.resource.data.thanhToanId == thanhToanId
+        && request.resource.data.khachHangId == order.khachHangId
+        && order.nhanVienHienTaiId == request.auth.uid
+        && order.trangThai == 'HOAN_THANH'
+        && order.thanhToanId == thanhToanId;
+    }
+
+    function staffConsumesPackage() {
+      let order = getAfter(
+        orderPath(request.resource.data.maDonCapNhatCuoi)
+      ).data;
+      let record = getAfter(recordPath(order.bienBanId)).data;
+      return isStaff()
+        && request.resource.data.maDonCapNhatCuoi is string
+        && order.nhanVienHienTaiId == request.auth.uid
+        && order.khachHangId == resource.data.khachHangId
+        && order.hinhThucTinhPhi == 'GOI_THANG'
+        && order.trangThai == 'HOAN_THANH'
+        && record.maDon == order.maDon
+        && request.resource.data.soKgDaDung
+          == resource.data.soKgDaDung + record.khoiLuongThucTe
+        && request.resource.data.soKgConLai
+          == (
+            resource.data.soKgConLai > record.khoiLuongThucTe
+              ? resource.data.soKgConLai - record.khoiLuongThucTe
+              : 0
+          )
+        && onlyChanges([
+          'soKgDaDung',
+          'soKgConLai',
+          'maDonCapNhatCuoi'
+        ]);
+    }
+
+    function canCreateOrderEvent() {
+      return hasActiveProfile()
+        && request.resource.data.maDon is string
+        && canActOnOrder(
+          getAfter(orderPath(request.resource.data.maDon)).data
+        );
+    }
+
+    match /VAI_TRO/{roleId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /NGUOI_DUNG/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+      allow create: if isSelf(userId)
+        && request.resource.data.userId == userId
+        && request.resource.data.uidFirebase == userId
+        && request.resource.data.roleId == 'CUSTOMER'
+        && request.resource.data.trangThai == 'ACTIVE';
+      allow update: if isAdmin()
+        || (
+          isSelf(userId)
+          && hasActiveProfile()
+          && onlyChanges([
+            'hoTen',
+            'soDienThoai',
+            'email',
+            'ngayCapNhat'
+          ])
+        );
       allow delete: if false;
     }
 
-    match /bien_ban_thu_gom/{bienBanId} {
-      allow read: if isActive() && (
-        isAdmin() ||
-        exists(/databases/$(database)/documents/don_thu_gom/$(resource.data.maDon))
-      );
-      allow create, update: if isActive() && (isNhanVien() || isAdmin());
+    match /KHACH_HANG/{customerId} {
+      allow read: if isSelf(customerId) || isAdmin();
+      allow create: if isCustomer()
+        && isSelf(customerId)
+        && request.resource.data.khachHangId == customerId;
+      allow update: if isAdmin()
+        || (
+          isCustomer()
+          && isSelf(customerId)
+          && onlyChanges(['ghiChuCSKH'])
+        );
       allow delete: if false;
     }
 
-    match /thanh_toan/{thanhToanId} {
-      allow read: if isActive() &&
-        (isAdmin() || resource.data.khachHangId == request.auth.uid);
-      allow create: if isActive() &&
-        (isKhachHang() || isNhanVien() || isAdmin());
-      allow update: if isActive() && (isNhanVien() || isAdmin());
+    match /NHAN_VIEN_THU_GOM/{staffId} {
+      allow read: if hasActiveProfile();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (
+          isStaff()
+          && isSelf(staffId)
+          && onlyChanges([
+            'trangThaiLamViec',
+            'viTriHienTai',
+            'toaDoLat',
+            'toaDoLng',
+            'capNhatViTriLuc',
+            'phanCongDangChoId'
+          ])
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['phanCongDangChoId'])
+            || (
+              resource.data.keys().hasAny(['phanCongDangChoId'])
+              && !request.resource.data.keys().hasAny([
+                'phanCongDangChoId'
+              ])
+            )
+          )
+        );
+    }
+
+    match /ADMIN/{adminId} {
+      allow read, create, update: if isAdmin();
       allow delete: if false;
     }
 
-    match /doanh_thu_nhan_vien/{doanhThuId} {
-      allow read: if isActive() &&
-        (isAdmin() || resource.data.nhanVienId == request.auth.uid);
-      allow create, update: if isActive() && (isNhanVien() || isAdmin());
+    match /DIA_CHI/{addressId} {
+      allow read: if isAdmin()
+        || isStaff()
+        || (
+          isCustomer()
+          && resource.data.khachHangId == request.auth.uid
+        );
+      allow create: if isCustomer()
+        && request.resource.data.diaChiId == addressId
+        && request.resource.data.khachHangId == request.auth.uid;
+      allow update, delete: if isAdmin()
+        || (
+          isCustomer()
+          && resource.data.khachHangId == request.auth.uid
+          && request.resource.data.khachHangId == request.auth.uid
+        );
+    }
+
+    match /LOAI_RAC/{wasteTypeId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /DICH_VU_GIA_BIEU/{priceId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /GOI_THU_GOM/{packageId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /DANG_KY_GOI/{subscriptionId} {
+      allow read: if isAdmin()
+        || isStaff()
+        || (
+          isCustomer()
+          && resource.data.khachHangId == request.auth.uid
+        );
+      allow create: if isCustomer()
+        && request.resource.data.khachHangId == request.auth.uid;
+      allow update: if isAdmin() || staffConsumesPackage();
       allow delete: if false;
     }
 
-    match /khieu_nai/{khieuNaiId} {
-      allow read: if isActive() &&
-        (isAdmin() || resource.data.nguoiGuiId == request.auth.uid);
-      allow create: if isActive() &&
-        request.resource.data.nguoiGuiId == request.auth.uid;
-      allow update: if isActive() && isAdmin();
+    match /DON_THU_GOM/{maDon} {
+      allow read: if hasActiveProfile() && canReadOrder(resource.data);
+      allow create: if validCustomerOrderCreate(maDon);
+      allow update: if isAdmin()
+        || customerCancelsOrder()
+        || staffAcceptsOffer()
+        || staffClaimsOpenOrder()
+        || staffDismissesOpenOrder()
+        || staffUpdatesArrival()
+        || staffTransitionsOrder()
+        || staffMarksProximityNotifications()
+        || staffCompletesOrder()
+        || staffCancelsOrder();
       allow delete: if false;
     }
 
-    match /thong_bao/{thongBaoId} {
-      allow read, update: if isActive() &&
-        (resource.data.nguoiNhanId == request.auth.uid || isAdmin());
-      allow create: if isActive() && (isNhanVien() || isAdmin());
+    match /PHAN_CONG_THU_GOM/{assignmentId} {
+      allow read: if isAdmin()
+        || (
+          isStaff()
+          && resource.data.nhanVienId == request.auth.uid
+        )
+        || (
+          isCustomer()
+          && get(orderPath(resource.data.maDon)).data.khachHangId
+            == request.auth.uid
+        );
+      allow create: if isAdmin()
+        || staffCreatesOpenAssignment(assignmentId);
+      allow update: if isAdmin()
+        || staffRespondsToAssignment()
+        || customerCancelsAssignment();
       allow delete: if false;
     }
 
-    match /hoa_don/{hoaDonId} {
-      allow read: if isActive() &&
-        (isAdmin() || resource.data.khachHangId == request.auth.uid);
-      allow create, update: if isActive() && (isNhanVien() || isAdmin());
+    match /BIEN_BAN_THU_GOM/{recordId} {
+      allow read: if hasActiveProfile()
+        && canReadOrder(get(orderPath(resource.data.maDon)).data);
+      allow create: if staffCreatesCompletionRecord(recordId);
+      allow update: if isAdmin();
       allow delete: if false;
     }
 
-    match /lich_su_hoat_dong/{logId} {
-      allow read: if isActive() && isAdmin();
-      allow create: if isActive();
+    match /THANH_TOAN/{paymentId} {
+      allow read: if hasActiveProfile()
+        && canReadOrder(get(orderPath(resource.data.maDon)).data);
+      allow create: if staffCreatesPayment(paymentId);
+      allow update: if isAdmin()
+        || (
+          hasActiveProfile()
+          && (
+            (
+              isCustomer()
+              && resource.data.khachHangId == request.auth.uid
+            )
+            || isAssignedStaff(
+              get(orderPath(resource.data.maDon)).data
+            )
+          )
+          && request.resource.data.trangThai == 'DA_THANH_TOAN'
+          && onlyChanges(['phuongThuc', 'trangThai', 'thoiGian'])
+        );
+      allow delete: if false;
+    }
+
+    match /HOA_DON/{invoiceId} {
+      allow read: if hasActiveProfile()
+        && canReadOrder(get(orderPath(resource.data.maDon)).data);
+      allow create, update: if isAdmin()
+        || (
+          isStaff()
+          && isAssignedStaff(
+            get(orderPath(request.resource.data.maDon)).data
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /DOANH_THU_NHAN_VIEN/{revenueId} {
+      allow read: if isAdmin()
+        || (
+          isStaff()
+          && resource.data.nhanVienId == request.auth.uid
+        );
+      allow create: if isAdmin()
+        || (
+          isStaff()
+          && request.resource.data.nhanVienId == request.auth.uid
+        );
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /KHIEU_NAI/{complaintId} {
+      allow read: if isAdmin()
+        || (
+          hasActiveProfile()
+          && resource.data.nguoiGuiId == request.auth.uid
+        );
+      allow create: if hasActiveProfile()
+        && request.resource.data.nguoiGuiId == request.auth.uid
+        && canReadOrder(
+          get(orderPath(request.resource.data.maDon)).data
+        );
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /DANH_GIA/{ratingId} {
+      allow read: if isAdmin()
+        || (
+          isStaff()
+          && resource.data.nhanVienId == request.auth.uid
+        )
+        || (
+          isCustomer()
+          && resource.data.khachHangId == request.auth.uid
+        );
+      allow create: if isCustomer()
+        && request.resource.data.khachHangId == request.auth.uid
+        && get(orderPath(request.resource.data.maDon)).data.trangThai
+          == 'HOAN_THANH';
       allow update, delete: if false;
     }
 
-    match /thong_ke_bao_cao/{baoCaoId} {
-      allow read: if isActive() && isAdmin();
-      allow create, update: if isActive() && isAdmin();
+    match /THONG_BAO/{notificationId} {
+      allow read: if isAdmin()
+        || (
+          hasActiveProfile()
+          && resource.data.nguoiNhanId == request.auth.uid
+        );
+      allow create: if canCreateOrderEvent()
+        && request.resource.data.thongBaoId == notificationId;
+      allow update: if isAdmin()
+        || (
+          hasActiveProfile()
+          && resource.data.nguoiNhanId == request.auth.uid
+          && request.resource.data.trangThaiDoc in [
+            'CHUA_DOC',
+            'DA_DOC'
+          ]
+          && onlyChanges(['trangThaiDoc'])
+        );
       allow delete: if false;
+    }
+
+    match /LICH_SU_HOAT_DONG/{logId} {
+      allow read: if isAdmin()
+        || (
+          hasActiveProfile()
+          && 'maDon' in resource.data
+          && canReadOrder(get(orderPath(resource.data.maDon)).data)
+        );
+      allow create: if hasActiveProfile()
+        && request.resource.data.logId == logId
+        && request.resource.data.userId == request.auth.uid
+        && canCreateOrderEvent();
+      allow update, delete: if false;
+    }
+
+    match /THONG_KE_TONG_HOP/{statisticId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /THAM_SO_HE_THONG/{parameterId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     match /{document=**} {

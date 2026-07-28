@@ -55,6 +55,19 @@ Customer booking and staff collection flows must stay operationally clear:
 - destructive actions use outlined or error styling
 - progress/timeline components must remain compact
 
+## Responsive List Pages
+
+List pages such as notifications, order history, invoices, and future admin
+lists use the same responsive shell:
+
+1. `AppPage(maxWidth: 900)` so desktop/web content uses the available space.
+2. A `LayoutBuilder` sets horizontal padding to `AppSpacing.screenHorizontal`
+   on mobile and `AppSpacing.xl` from 720 px upward.
+3. List cards fill the available content width; do not constrain them to a
+   mobile-width column on web.
+4. Wrap the list in a native `Scrollbar` only when `kIsWeb` is true. Mobile
+   uses platform scrolling without a visible scrollbar.
+
 ## Creative rule
 When creating a new screen without an exact reference:
 

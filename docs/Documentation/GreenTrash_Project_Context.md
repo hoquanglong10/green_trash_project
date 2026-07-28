@@ -13,9 +13,15 @@ File nay tong hop yeu cau nghiep vu tu docx/PDF goc. Khi co mau thuan giua tai l
 3. `docs/design-tokens.md`, `docs/ui-style-guide.md`, va `AGENTS.md` cho UI.
 4. Docx/PDF goc cho quy dinh nghiep vu con lai.
 
-Trang thai hien tai cua repo la UI + mock state, chua co Firebase runtime. Dat don, de xuat nhan vien, nhan/tu choi, va cap nhat trang thai hien chi song trong bo nho va se reset khi hot restart.
+Trang thai hien tai cua repo: UI van dung mock state va se reset khi hot
+restart. Firebase da duoc khoi tao; repository Firestore, transaction, Rules,
+va indexes cho hang cho don mo da co trong source nhung chua duoc noi vao man
+hinh vi Auth van la demo.
 
-Quyet dinh flow chinh cua san pham: khach dat don -> he thong de xuat nhan vien gan/phu hop -> nhan vien nhan hoac tu choi -> he thong de xuat nguoi ke tiep. Admin chi can thiep khi khong co nguoi phu hop, can dieu phoi lai, hoac co su co. Admin khong phan cong thu cong tung don trong flow binh thuong.
+Quyet dinh flow chinh cho do an: khach dat don -> don vao hang cho mo -> cac
+nhan vien dang san sang cung xem -> nguoi nhan transaction dau tien phu trach.
+Nhan vien co the bo qua de an don khoi danh sach cua minh. Admin chi can thiep
+khi can dieu phoi lai hoac co su co.
 
 ## 1. Tong Quan
 
@@ -28,10 +34,12 @@ Kien truc muc tieu trong tai lieu:
 - Firebase Authentication cho dang ky, dang nhap, quen mat khau, UID va role.
 - Cloud Firestore cho du lieu nghiep vu.
 - Cloud Storage cho anh bang chung thu gom va hoa don PDF.
-- Cloud Functions cho phan cong, kiem tra gio lam viec, tinh phi, cap nhat han muc/doanh thu/thong ke.
+- Firestore transaction phia app cho nhan don va cap nhat trang thai.
+- Cloud Functions/FCM la phan nang cao tuy chon, khong bat buoc cho ban nop mon.
 - Firebase Cloud Messaging cho thong bao realtime.
 
-Luu y: day la kien truc muc tieu. Firebase packages va configuration da co trong repo, nhung `main.dart` chua khoi tao Firebase va repository dang la mock.
+Luu y: `main.dart` da khoi tao Firebase. Repository dang duoc man hinh su dung
+van la mock; production order repository nam trong `lib/features/orders/`.
 
 ## 2. Vai Tro
 
@@ -49,8 +57,8 @@ Khach hang:
 
 Nhan vien thu gom:
 
-- Dang nhap, xem offer don moi cua minh va don da nhan.
-- Nhan/tu choi don.
+- Dang nhap, xem hang cho don moi va don da nhan.
+- Nhan/bo qua don.
 - Chot gio den du kien.
 - Cap nhat trang thai di chuyen/tien trinh.
 - Kiem tra phan loai rac, can kg thuc te.
@@ -185,21 +193,21 @@ BM03 - Phieu doi diem/nhan qua trong tai lieu, nhung noi dung thuc te gan voi go
 
 ## 6. Luong Chinh
 
-Dat lich thu gom va de xuat nhan vien:
+Dat lich thu gom va dua vao hang cho:
 
 1. Khach hang chon dich vu/bang gia, dia chi, loai rac, khoi luong du kien, ngay, khung gio, goi thang hoac tra theo kg.
 2. He thong kiem tra dang nhap, thong tin bat buoc, loai rac, goi/thanh toan, gio lam viec va ca phu hop.
-3. He thong tao don, sinh ma don, luu lich su; don o `CHO_XU_LY` trong luc tim nguoi nhan.
-4. Dispatcher chon nhan vien dang san sang, uu tien khu vuc gan/phu hop, va gui thong bao de xuat don moi cho mot nhan vien tai mot thoi diem.
-5. Neu khong co nguoi phu hop, don giu `CHO_XU_LY` va hien trong hang doi can admin/CSKH can thiep. Khach hang duoc thong bao trang thai cho xu ly.
+3. He thong tao don, sinh ma don, luu lich su; don o `CHO_XU_LY`.
+4. Tat ca nhan vien dang san sang co the xem don trong hang cho.
+5. Neu chua ai nhan, don tiep tuc giu `CHO_XU_LY`; khach hang thay trang thai dang cho nhan.
 
-Nhan hoac tu choi don thu gom:
+Nhan hoac bo qua don thu gom:
 
-1. Nhan vien chi mo duoc offer cua minh va xem thong tin can thiet de quyet dinh.
-2. He thong kiem tra nhan vien dang trong gio lam viec 06:00-17:00, offer con hieu luc, va don chua bi huy/da nhan boi nguoi khac.
-3. Nhan vien bam Nhan don hoac Tu choi; tu choi phai co ly do khi dua vao backend that.
+1. Nhan vien xem danh sach cac don `CHO_XU_LY` chua bo qua.
+2. App kiem tra nhan vien dang san sang, khung gio phu hop, va don chua bi huy/da nhan.
+3. Nhan vien bam Nhan don hoac Bo qua; bo qua phai co ly do.
 4. Neu nhan: he thong gan `nhanVienHienTaiId`, chuyen don sang `DA_NHAN`, luu lich su, va thong bao khach hang. Nhan vien co the chot gio den du kien trong khung gio khach chon.
-5. Neu tu choi: he thong luu audit tu choi va de xuat offer cho nhan vien phu hop ke tiep. Chi khi da het lua chon moi dua don ve hang doi can admin can thiep.
+5. Neu bo qua: he thong luu audit va an don voi nhan vien do; nhan vien khac van thay. Neu hai nguoi cung bam nhan, transaction chi cho mot nguoi thanh cong.
 
 Cap nhat tien trinh:
 
@@ -234,7 +242,7 @@ Huy don/khieu nai:
 
 Trang thai `DON_THU_GOM` da duoc audit va dang duoc UI support:
 
-- `CHO_XU_LY`: don moi, he thong dang tim/luan chuyen offer cho nhan vien; day la hang doi exception neu khong con nguoi phu hop.
+- `CHO_XU_LY`: don moi dang nam trong hang cho de nhan vien san sang nhan.
 - `CHO_NHAN`: chi dung khi admin/CSKH chon nhan vien trong truong hop override.
 - `DA_NHAN`: nhan vien da chap nhan va tro thanh `nhanVienHienTaiId`.
 - `DANG_DEN`: nhan vien dang di den diem thu gom.
@@ -293,13 +301,17 @@ Chi tiet required/optional field va enum nam trong `lib/schema_contract.dart`; k
 Field cot loi:
 
 - User: userId, uidFirebase, roleId, hoTen, soDienThoai, email, trangThai, ngayTao, ngayCapNhat.
-- Staff: nhanVienId, maNhanVien, trangThaiLamViec, gioBatDau, gioKetThuc, doanhThuHienTai, viTriHienTai.
+- Staff: nhanVienId, maNhanVien, trangThaiLamViec, gioBatDau, gioKetThuc,
+  doanhThuHienTai, viTriHienTai, toaDoLat, toaDoLng, capNhatViTriLuc,
+  phanCongDangChoId.
 - Address: diaChiId, khachHangId, diaChiChiTiet, phuongXa, quanHuyen, tinhThanh, toaDoLat, toaDoLng, macDinh, trangThai.
 - WasteType: loaiRacId, nhomRac, tenLoaiRac, moTa, trangThai.
 - PriceTable: bangGiaId, loaiRacId, tenDichVu, donGiaKg, khuVuc, ngayHieuLuc, ngayHetHieuLuc, trangThai.
 - MonthlyPackage: goiId, tenGoi, hanMucKgThang, giaGoi, phiVuotGoi, moTa, trangThai.
 - PackageSubscription: dangKyGoiId, khachHangId, goiId, thangNam, soKgDaDung, soKgConLai, ngayDangKy, ngayHetHan, trangThai.
-- PickupOrder: maDon, khachHangId, diaChiId, nhanVienHienTaiId, loaiRacId, khoiLuongDuKien, ngayThuGom, khungGio, gioChot, hinhThucTinhPhi, trangThai, ghiChu, ngayTao.
+- PickupOrder: maDon, khachHangId, diaChiId, nhanVienHienTaiId,
+  phanCongHienTaiId, nhanVienTuChoiIds, loaiRacId, khoiLuongDuKien,
+  ngayThuGom, khungGio, gioChot, hinhThucTinhPhi, trangThai, ghiChu, ngayTao.
 - Assignment: phanCongId, maDon, nhanVienId, adminId, thoiGianPhanCong, trangThaiPhanCong, lyDoTuChoi.
 - Confirmation: bienBanId, maDon, nhanVienId, loaiRacThucTeId, khoiLuongThucTe, anhXacNhanUrl, phiPhaiTra, trangThaiThanhToan, thoiGianLap.
 - Payment: thanhToanId, maDon, khachHangId, soTien, phuongThuc, maGiaoDichNgoai, trangThai, thoiGian.
@@ -310,7 +322,11 @@ Field cot loi:
 - AggregateStat: thongKeId, ngayThongKe, khuVuc, loaiRacId, tongSoDon, tongKg, tongDoanhThu, soKhieuNai.
 - SystemParameter: thamSoId, maThamSo, giaTri, moTa, ngayHieuLuc, trangThai.
 
-Khoang cach can xu ly truoc khi gan backend that: mock `PickupOrder` co `nhanVienDeXuatId` va `nhanVienTuChoiIds` de phuc vu direct-offer flow, nhung hai field nay chua co trong contract Firestore da audit. `PHAN_CONG_THU_GOM` hien cung yeu cau `adminId`. Nhom phai chon migration schema ro rang theo `docs/screens/order-flow.md`, sau do cap nhat contract, mapper, rules, va tests dong thoi.
+Open-queue persistence da chot: `nhanVienTuChoiIds` duoc ghi vao don de an don
+voi nhan vien da bo qua; `nhanVienDeXuatId` va `offerExpiresAt` van chi la
+field mock legacy. Nhan/bo qua duoc audit trong `PHAN_CONG_THU_GOM` voi
+`nguonPhanCong = HE_THONG`. Chi tiet nam trong
+`docs/backend-order-workflow.md`.
 
 ## 9. Tham So He Thong Mac Dinh
 
@@ -341,9 +357,9 @@ Nhan vien:
 
 - Dang nhap.
 - Trang chu nhan vien.
-- Danh sach offer don moi cua minh va don da nhan.
+- Hang cho don moi va don da nhan.
 - Chi tiet don nhan.
-- Nhan/Tu choi/Chot gio.
+- Nhan/Bo qua/Chot gio.
 - Cap nhat tien trinh.
 - Kiem tra - xac nhan rac.
 - Thu tien.
@@ -387,7 +403,7 @@ Khach hang wireframe:
 
 Nhan vien wireframe:
 
-- Trang chu: ca lam viec 06:00-17:00, offer don moi cua minh, nut nhan/tu choi, don da nhan hom nay.
+- Trang chu: ca lam viec 06:00-17:00, hang cho don moi, nut nhan/bo qua, don da nhan hom nay.
 - Chi tiet don: ma don, thong tin khach, dia chi, loai rac, kg du kien, khung gio, chot gio, cap nhat trang thai, ban do/goi khach, huy don va nhap ly do.
 - Cap nhat tien trinh: chon trang thai don, vi tri gan nhat/GPS, luu trang thai va thong bao khach hang.
 - Xac nhan thu gom: loai rac thuc te, kg thuc te, khung chup/upload anh, tu dong tinh phi, ghi nhan thu tien tai cho, hoan thanh don.
@@ -404,7 +420,7 @@ Admin wireframe:
 
 - Moi tai khoan gan UID Firebase duy nhat.
 - Khach hang chi sua ho so va don cua minh khi con hop le.
-- Nhan vien chi xem offer cua minh, nhan/tu choi offer cua minh, va cap nhat don ma minh da nhan.
+- Nhan vien duoc xem don `CHO_XU_LY`, nhan/bo qua, va chi cap nhat don ma minh da nhan.
 - Admin quan ly bang gia, goi, tham so, tai khoan, thong ke.
 - CSKH/Admin xu ly khieu nai.
 - Thanh toan khong luu thong tin the/mat khau ngan hang nhay cam.
@@ -416,14 +432,23 @@ Nhung buoc da co trong repo:
 
 1. GreenTrash shell, design system, logo, va navigation 3 role.
 2. Mock data/model/enums cho cac man hinh chinh.
-3. Customer booking, theo doi don, staff offer/accept/reject, cap nhat tien trinh, va admin exception assignment o muc mock.
+3. Customer booking, theo doi don, staff open-queue/claim/dismiss, cap nhat
+   tien trinh, va admin exception assignment o muc mock.
+
+Da co trong source:
+
+4. Open-queue schema, Firestore Rules/indexes uppercase, repository/mappers
+   va transaction nhan don.
+5. Transaction/stream cho order flow, `THONG_BAO`,
+   `LICH_SU_HOAT_DONG`, BM02, payment va quota goi thang.
 
 Thu tu tiep theo:
 
-4. Chot migration cho direct-offer flow va sua Firestore Rules sang schema uppercase.
-5. Khoi tao Firebase, Firebase Auth, va Firestore repository/mappers.
-6. Chuyen order flow sang realtime transaction/stream; ghi `THONG_BAO` va `LICH_SU_HOAT_DONG` cho moi transition.
-7. Gan Cloud Storage cho anh bang chung, sau do mo rong payment, invoice, doanh thu, package, complaint, va FCM.
+6. Migrate du lieu legacy va deploy Firestore Rules/indexes sau khi review.
+7. Thay demo session bang Firebase Auth va chuyen toan bo customer/staff flow
+   sang production provider trong cung mot vertical slice.
+8. Gan Cloud Storage cho anh bang chung, payment gateway, invoice,
+   doanh thu, package, complaint va bao cao.
 
 Quy tac uu tien khi co mau thuan:
 

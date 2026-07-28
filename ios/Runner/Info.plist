@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>GreenTrash cần vị trí của nhân viên khi đang di chuyển đến điểm thu gom để khách hàng theo dõi đơn.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>GreenTrash cần camera để nhân viên chụp ảnh xác nhận đã thu gom.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

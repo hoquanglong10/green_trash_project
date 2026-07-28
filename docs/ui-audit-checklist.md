@@ -33,6 +33,8 @@ Before finishing any UI task, verify:
 - [ ] Typography remains compact
 - [ ] Page background uses light gray and cards/forms use white
 - [ ] No unrelated visual language introduced
+- [ ] List screens use the responsive 900px shell, adaptive horizontal padding,
+      full-width list cards, and a web-only native scrollbar.
 
 ## Scope control
 - [ ] No unrelated files changed

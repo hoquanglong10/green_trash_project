@@ -130,6 +130,8 @@ class AppSizes {
   static const double inputHeight = 46;
   static const double buttonHeight = 46;
   static const double socialButtonHeight = 44;
+  static const double compactControlHeight = 34;
+  static const double timeSlotChipWidth = 128;
   static const double cardRadius = AppRadius.lg;
   static const double promoCardRadius = AppRadius.xl;
 }

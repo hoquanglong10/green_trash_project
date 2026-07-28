@@ -8,7 +8,9 @@ Ket qua: quet duoc 38 documents trong 22 collections bang Firestore REST API. Da
 
 ## Pham Vi Va Trang Thai Tich Hop
 
-Day la audit read-only cua database that, khong phai mo ta cua mock app. Hien tai app chay `MockGreenTrashRepository`, chua khoi tao Firebase runtime va chua doc/ghi vao bat ky collection nao khi nguoi dung thao tac.
+Day la audit read-only cua database that, khong phai mo ta cua mock app. App da
+khoi tao Firebase runtime nhung cac screen hien tai van chay
+`MockGreenTrashRepository`; thao tac UI chua doc/ghi Firestore.
 
 `lib/schema_contract.dart` la ban code-level cua audit nay. Neu field/database thay doi, cap nhat audit va contract cung mot commit.
 
@@ -70,17 +72,33 @@ Day la audit read-only cua database that, khong phai mo ta cua mock app. Hien ta
 - Sample `DANG_KY_GOI.trangThai` dang la `CON_HL`, nen UI nen map label "Con hieu luc" cho ca `CON_HL` va `CON_HIEU_LUC`.
 - Sample `THANH_TOAN.trangThai` dang la `DA_TT`, nen UI nen map label "Da thanh toan" cho ca `DA_TT` va `DA_THANH_TOAN`.
 - Sample `THANH_TOAN.phuongThuc` dang la `GOI_THANG`, trong khi tham so payment method la `TIEN_MAT`, `BANKING`, `VI_DIEN_TU`.
-- File `firestore.rules` hien tai trong workspace van la ban cu lower_snake_case. Khong nen deploy lai rules do truoc khi doi sang schema uppercase nay.
+- File `firestore.rules` trong workspace da dung collection uppercase va hang
+  cho don mo; van phai dry-run va review truoc khi deploy.
 
-## Khoang Cach Voi Direct-Offer Flow Da Chot
+## Open-Queue Persistence Cho Do An
 
-Mock UI hien tai de xuat don truc tiep cho mot nhan vien qua `PickupOrder.nhanVienDeXuatId` va luu danh sach tu choi trong `nhanVienTuChoiIds`. Hai field nay **chua ton tai trong `DON_THU_GOM` da audit**.
+Phuong an nop mon dung hang cho don mo, khong dung Cloud Functions dispatcher:
 
-`PHAN_CONG_THU_GOM` da co `maDon`, `nhanVienId`, `trangThaiPhanCong`, `thoiGianPhanCong`, va `lyDoTuChoi`, nhung `adminId` dang la required. Vi vay no chua the bieu dien offer do he thong tu tao mot cach dung nghia.
+- Don moi co `trangThai = CHO_XU_LY`; moi nhan vien dang san sang co the xem.
+- Nhan vien bam nhan se tao `PHAN_CONG_THU_GOM.DA_NHAN` va cap nhat
+  `DON_THU_GOM` trong cung transaction.
+- Nhan vien bam bo qua se tao `PHAN_CONG_THU_GOM.TU_CHOI` va them UID vao
+  `DON_THU_GOM.nhanVienTuChoiIds`.
+- Nhan vien dau tien commit transaction khi don van `CHO_XU_LY` se thang.
+- `nguonPhanCong = HE_THONG`; admin override van dung `ADMIN`.
+- `CHO_PHAN_HOI` va `HET_HAN` chi can cho ban Functions nang cao, khong nam
+  trong runtime co ban.
 
-Truoc khi backend core duoc noi vao Firestore, can co migration da duyet:
+`nhanVienHienTaiId` va `phanCongHienTaiId` chi duoc gan khi nhan thanh cong.
+`soLanDeXuat` duoc dung nhu bo dem phan hoi don trong ban co ban.
+Khi hoan tat, `DON_THU_GOM.bienBanId` va `thanhToanId` tham chieu cac document
+duoc tao trong cung transaction. `DANG_KY_GOI.maDonCapNhatCuoi` cho phep Rules
+xac minh lan tru quota gói thang thuoc dung don.
 
-1. Dung `PHAN_CONG_THU_GOM` lam audit cho ca system offer va admin override; them `nguonPhanCong` va cho phep `adminId` null voi system offer; hoac
-2. Them cac proposal fields vao `DON_THU_GOM`, con `PHAN_CONG_THU_GOM` chi ghi assignment da chap nhan.
-
-Khong duoc sua UI de tu suy doan field moi. Sau khi chot, cap nhat `lib/schema_contract.dart`, repository mapper, Firestore Rules, indexes, test, va tai lieu order flow cung luc.
+`toaDoLat`, `toaDoLng`, `capNhatViTriLuc`, va `phanCongDangChoId` duoc giu lai
+cho phien ban nang cao; hang cho co ban khong bat buoc cac field nay. Khi GPS
+foreground duoc bat cho don `DANG_DEN`, app cap nhat toa do sau moi 10 m va bo
+qua diem co sai so lon hon 50 m. `DON_THU_GOM.daThongBaoNhanVienSapDen` va
+`daThongBaoNhanVienDaDen` la co transaction de tao toi da mot thong bao sap den
+(200 m) va mot thong bao da den (30 m) cho khach hang; GPS khong tu dong doi
+trang thai don.

@@ -35,7 +35,8 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
   }
 
   testWidgets('customer home renders on mobile', (tester) async {
@@ -62,7 +63,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Chi tiết đơn thu gom'), findsOneWidget);
     expect(
-      find.text('Đang tìm nhân viên', skipOffstage: false),
+      find.text('Đang chờ nhân viên nhận', skipOffstage: false),
       findsOneWidget,
     );
   });

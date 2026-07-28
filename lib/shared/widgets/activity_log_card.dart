@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/utils/formatters.dart';
-import '../../../../models/app_models.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
+import '../../models/app_models.dart';
 
 class ActivityLogCard extends StatelessWidget {
   const ActivityLogCard({super.key, required this.log});
@@ -53,7 +53,8 @@ class ActivityLogCard extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.sm),
             Text(
-              formatDayMonth(log.thoiGian),
+              formatDateTime(log.thoiGian),
+              textAlign: TextAlign.right,
               style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
