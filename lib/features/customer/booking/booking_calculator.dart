@@ -1,5 +1,6 @@
 import '../../../core/utils/formatters.dart';
 import '../../../models/app_models.dart';
+import '../../orders/domain/staff_dispatch_ranker.dart';
 
 class BookingEstimate {
   const BookingEstimate({
@@ -71,6 +72,11 @@ BookingValidation validateBooking({
 }) {
   if (address == null) {
     return const BookingValidation.invalid('Vui lòng chọn địa chỉ lấy rác.');
+  }
+  if (!address.hasPickupCoordinate) {
+    return const BookingValidation.invalid(
+      'Địa chỉ chưa có điểm bản đồ. Vui lòng cập nhật trong sổ địa chỉ.',
+    );
   }
   if (waste == null) {
     return const BookingValidation.invalid('Vui lòng chọn loại rác.');
@@ -174,13 +180,7 @@ StaffProfile? suggestedStaffForAddress({
       .toList();
   if (available.isEmpty) return null;
 
-  available.sort((a, b) {
-    final aSameArea = _sameArea(address, a) ? 0 : 1;
-    final bSameArea = _sameArea(address, b) ? 0 : 1;
-    final areaCompare = aSameArea.compareTo(bSameArea);
-    if (areaCompare != 0) return areaCompare;
-    return a.doanhThuHienTai.compareTo(b.doanhThuHienTai);
-  });
+  available.sort((a, b) => compareStaffForPickup(a, b, address));
 
   return available.first;
 }
@@ -204,13 +204,6 @@ PriceItem? findPrice(List<PriceItem> prices, String? loaiRacId) {
     if (price.loaiRacId == loaiRacId) return price;
   }
   return null;
-}
-
-bool _sameArea(CustomerAddress? address, StaffProfile staff) {
-  if (address == null) return false;
-  return staff.viTriHienTai.toLowerCase().contains(
-    address.quanHuyen.toLowerCase(),
-  );
 }
 
 DateTime? _slotStart(DateTime date, String slot) {

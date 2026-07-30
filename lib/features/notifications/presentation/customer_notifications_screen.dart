@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/app_providers.dart';
 import '../../../shared/widgets/app_widgets.dart';
+import '../../../shared/widgets/home_dashboard_widgets.dart';
 import 'widgets/notification_list_item.dart';
 
 class CustomerNotificationsScreen extends ConsumerWidget {
@@ -40,8 +41,12 @@ class CustomerNotificationsScreen extends ConsumerWidget {
                   itemCount: notifications.length,
                   separatorBuilder: (_, _) =>
                       const SizedBox(height: AppSpacing.sm),
-                  itemBuilder: (_, index) =>
-                      NotificationListItem(notification: notifications[index]),
+                  itemBuilder: (_, index) => AnimatedEntrance(
+                    order: index.clamp(0, 5),
+                    child: NotificationListItem(
+                      notification: notifications[index],
+                    ),
+                  ),
                 );
                 return kIsWeb ? Scrollbar(child: list) : list;
               },

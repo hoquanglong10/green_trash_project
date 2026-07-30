@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_widgets.dart';
 
 class BookingSubmitPanel extends StatelessWidget {
   const BookingSubmitPanel({
@@ -20,10 +21,14 @@ class BookingSubmitPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.surface,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -55,11 +60,11 @@ class BookingSubmitPanel extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpacing.md),
                 SizedBox(
-                  width: 150,
-                  child: FilledButton.icon(
+                  width: 142,
+                  child: PrimaryActionButton(
                     onPressed: canSubmit ? onSubmit : null,
-                    icon: const Icon(Icons.send_outlined),
-                    label: const Text('Gửi đơn'),
+                    icon: Icons.send_outlined,
+                    label: 'Gửi đơn',
                   ),
                 ),
               ],

@@ -19,3 +19,12 @@ String formatKg(num value) {
       : value.toStringAsFixed(1);
   return '$rounded kg';
 }
+
+String formatOrderCode(String value) {
+  final raw = value.trim().replaceFirst(
+    RegExp(r'^DON_?', caseSensitive: false),
+    '',
+  );
+  final compact = raw.length <= 8 ? raw : raw.substring(raw.length - 8);
+  return 'Đơn #${compact.toUpperCase()}';
+}

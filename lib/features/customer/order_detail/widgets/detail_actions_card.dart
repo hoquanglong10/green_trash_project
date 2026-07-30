@@ -6,6 +6,7 @@ import '../../../orders/application/order_workflow_providers.dart';
 import '../../../orders/domain/order_workflow_models.dart';
 import '../../../../models/app_models.dart';
 import '../../../../providers/app_providers.dart';
+import '../../../../shared/widgets/app_widgets.dart';
 import '../../../../shared/widgets/order_reason_sheet.dart';
 
 class DetailActionsCard extends ConsumerWidget {
@@ -82,7 +83,7 @@ class DetailActionsCard extends ConsumerWidget {
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: FilledButton.icon(
+              child: PrimaryActionButton(
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -92,8 +93,8 @@ class DetailActionsCard extends ConsumerWidget {
                     ),
                   );
                 },
-                icon: const Icon(Icons.support_agent_outlined),
-                label: const Text('Hỗ trợ'),
+                icon: Icons.support_agent_outlined,
+                label: 'Hỗ trợ',
               ),
             ),
           ],

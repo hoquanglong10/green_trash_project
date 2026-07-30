@@ -24,9 +24,14 @@ class ScheduleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           children: [
             Row(
@@ -63,7 +68,7 @@ class ScheduleCard extends StatelessWidget {
                 ),
               ],
             ),
-            const Divider(height: AppSpacing.xxl),
+            const Divider(height: AppSpacing.xxxl),
             if (timeSlots.isEmpty)
               Container(
                 width: double.infinity,

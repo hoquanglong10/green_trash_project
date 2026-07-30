@@ -115,7 +115,7 @@ class _OrderReasonSheetState extends State<_OrderReasonSheet> {
                   Text(
                     'Vui lòng nhập lý do trước khi tiếp tục.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.accent,
+                      color: AppColors.error,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

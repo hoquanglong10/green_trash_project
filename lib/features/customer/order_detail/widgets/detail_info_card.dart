@@ -21,7 +21,12 @@ class DetailInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
@@ -29,18 +34,10 @@ class DetailInfoCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: const Icon(
-                    Icons.recycling,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
+                const Icon(
+                  Icons.recycling_rounded,
+                  color: AppColors.primary,
+                  size: 24,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -67,7 +64,9 @@ class DetailInfoCard extends StatelessWidget {
                 StatusChip(status: order.trangThai, compact: true),
               ],
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
+            const Divider(),
+            const SizedBox(height: AppSpacing.xs),
             DetailRow(
               icon: Icons.scale_outlined,
               label: 'Dự kiến',

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:green_trash_project/features/customer/booking/booking_calculator.dart';
+import 'package:green_trash_project/models/app_models.dart';
 import 'package:green_trash_project/repositories/green_trash_repository.dart';
 
 void main() {
@@ -60,5 +61,37 @@ void main() {
 
     expect(validation.canSubmit, isFalse);
     expect(validation.message, contains('không còn hiệu lực'));
+  });
+
+  test('booking validation requires a confirmed pickup map point', () {
+    final repository = MockGreenTrashRepository();
+    const addressWithoutMapPoint = CustomerAddress(
+      diaChiId: 'DIA_CHI_LEGACY',
+      khachHangId: 'USER_KH_001',
+      diaChiChiTiet: '99 Quang Trung',
+      phuongXa: 'Phường 10',
+      quanHuyen: 'Gò Vấp',
+      tinhThanh: 'TP. Hồ Chí Minh',
+      toaDoLat: 0,
+      toaDoLng: 0,
+      macDinh: true,
+    );
+
+    final validation = validateBooking(
+      address: addressWithoutMapPoint,
+      waste: repository.wasteTypes.first,
+      kg: 5,
+      pickupDate: DateTime(2026, 7, 30),
+      timeSlot: '10:00-12:00',
+      availableSlots: const ['10:00-12:00'],
+      paymentMethod: 'THEO_KG',
+      subscription: repository.subscriptions.first,
+      package: repository.packages.first,
+      customerOrders: const [],
+      now: DateTime(2026, 7, 30, 6),
+    );
+
+    expect(validation.canSubmit, isFalse);
+    expect(validation.message, contains('điểm bản đồ'));
   });
 }

@@ -6,6 +6,7 @@ import '../../../models/app_models.dart';
 import '../../../schema_contract.dart';
 import '../domain/order_workflow_models.dart';
 import '../domain/order_workflow_repository.dart';
+import '../domain/staff_dispatch_ranker.dart';
 import 'firestore_order_mapper.dart';
 
 class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
@@ -28,6 +29,7 @@ class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
   };
   static const _nearPickupDistanceMeters = 200.0;
   static const _arrivedPickupDistanceMeters = 30.0;
+  static const _offerValidity = Duration(minutes: 2);
   static const _allowedTransitions = <String, String>{
     'DA_NHAN': 'DANG_DEN',
     'DANG_DEN': 'DA_DEN',
@@ -93,23 +95,28 @@ class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
 
   @override
   Stream<List<PickupOrder>> watchOpenOrders(String staffId) {
-    return _orders.where('trangThai', isEqualTo: 'CHO_XU_LY').snapshots().map((
-      snapshot,
-    ) {
-      final orders = snapshot.docs
-          .map(
-            (doc) => FirestoreOrderMapper.fromMap(
-              documentId: doc.id,
-              data: doc.data(),
-            ),
-          )
-          .where((order) => !order.nhanVienTuChoiIds.contains(staffId))
-          .toList(growable: false);
-      orders.sort(
-        (first, second) => first.ngayThuGom.compareTo(second.ngayThuGom),
-      );
-      return orders;
-    });
+    return _orders
+        .where('nhanVienDeXuatId', isEqualTo: staffId)
+        .snapshots()
+        .map((snapshot) {
+          final orders = snapshot.docs
+              .map(
+                (doc) => FirestoreOrderMapper.fromMap(
+                  documentId: doc.id,
+                  data: doc.data(),
+                ),
+              )
+              .where(
+                (order) =>
+                    order.trangThai == 'CHO_XU_LY' &&
+                    !order.nhanVienTuChoiIds.contains(staffId),
+              )
+              .toList(growable: false);
+          orders.sort(
+            (first, second) => first.ngayThuGom.compareTo(second.ngayThuGom),
+          );
+          return orders;
+        });
   }
 
   @override
@@ -224,49 +231,116 @@ class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
         .collection(loaiRacCollection)
         .doc(command.loaiRacId);
     final logRef = _newDocument(lichSuHoatDongCollection, 'LOG');
-    final orderData = FirestoreOrderMapper.createData(
-      maDon: maDon,
-      command: command,
-      now: now,
+    final addressSnapshot = await addressRef.get();
+    final addressData = addressSnapshot.data();
+    if (!addressSnapshot.exists || addressData == null) {
+      throw const OrderWorkflowException(
+        'address-not-found',
+        'Địa chỉ thu gom không tồn tại.',
+      );
+    }
+    if (addressData['khachHangId'] != command.khachHangId) {
+      throw const OrderWorkflowException(
+        'address-owner-mismatch',
+        'Địa chỉ không thuộc khách hàng đang đặt đơn.',
+      );
+    }
+
+    final address = _dispatchAddress(command.diaChiId, addressData);
+    if (!address.hasPickupCoordinate) {
+      throw const OrderWorkflowException(
+        'address-location-required',
+        'Địa chỉ chưa có điểm thu gom hợp lệ trên bản đồ.',
+      );
+    }
+    final candidates = await _rankedDispatchCandidates(
+      address: address,
+      timeSlot: command.khungGio,
+      rejectedStaffIds: const [],
     );
 
-    await _firestore.runTransaction((transaction) async {
-      final addressSnapshot = await transaction.get(addressRef);
-      final wasteTypeSnapshot = await transaction.get(wasteTypeRef);
-      if (!addressSnapshot.exists) {
-        throw const OrderWorkflowException(
-          'address-not-found',
-          'Địa chỉ thu gom không tồn tại.',
-        );
-      }
-      if (addressSnapshot.data()?['khachHangId'] != command.khachHangId) {
-        throw const OrderWorkflowException(
-          'address-owner-mismatch',
-          'Địa chỉ không thuộc khách hàng đang đặt đơn.',
-        );
-      }
-      if (!wasteTypeSnapshot.exists) {
-        throw const OrderWorkflowException(
-          'waste-type-not-found',
-          'Loại rác không tồn tại.',
-        );
-      }
-
-      transaction.set(orderRef, orderData);
-      transaction.set(
-        logRef,
-        _activityData(
-          ref: logRef,
-          maDon: maDon,
-          userId: command.khachHangId,
-          action: 'Tạo đơn thu gom',
-          note: 'Khách hàng đã gửi yêu cầu thu gom.',
-          time: now,
-        ),
+    for (final candidate in <StaffProfile?>[...candidates, null]) {
+      final offerExpiresAt = candidate == null ? null : now.add(_offerValidity);
+      final orderData = FirestoreOrderMapper.createData(
+        maDon: maDon,
+        command: command,
+        now: now,
+        suggestedStaffId: candidate?.nhanVienId,
+        offerExpiresAt: offerExpiresAt,
       );
-    });
+      final notificationRef = candidate == null
+          ? null
+          : _newDocument(thongBaoCollection, 'TB');
+      try {
+        await _firestore.runTransaction((transaction) async {
+          final verifiedAddress = await transaction.get(addressRef);
+          final wasteTypeSnapshot = await transaction.get(wasteTypeRef);
+          if (!verifiedAddress.exists ||
+              verifiedAddress.data()?['khachHangId'] != command.khachHangId) {
+            throw const OrderWorkflowException(
+              'address-owner-mismatch',
+              'Địa chỉ không thuộc khách hàng đang đặt đơn.',
+            );
+          }
+          if (!wasteTypeSnapshot.exists) {
+            throw const OrderWorkflowException(
+              'waste-type-not-found',
+              'Loại rác không tồn tại.',
+            );
+          }
+          if (candidate != null) {
+            final staffSnapshot = await transaction.get(
+              _firestore
+                  .collection(nhanVienThuGomCollection)
+                  .doc(candidate.nhanVienId),
+            );
+            if (!_isAvailableStaffData(staffSnapshot.data())) {
+              throw const OrderWorkflowException(
+                'dispatch-candidate-unavailable',
+                'Nhân viên vừa chuyển sang trạng thái bận.',
+              );
+            }
+          }
 
-    return FirestoreOrderMapper.fromMap(documentId: maDon, data: orderData);
+          transaction.set(orderRef, orderData);
+          transaction.set(
+            logRef,
+            _activityData(
+              ref: logRef,
+              maDon: maDon,
+              userId: command.khachHangId,
+              action: 'Tạo đơn thu gom',
+              note: candidate == null
+                  ? 'Đơn đang chờ nhân viên phù hợp.'
+                  : 'Đã gửi đề xuất đến ${candidate.maNhanVien}.',
+              time: now,
+            ),
+          );
+          if (candidate != null && notificationRef != null) {
+            transaction.set(
+              notificationRef,
+              _notificationData(
+                ref: notificationRef,
+                recipientId: candidate.nhanVienId,
+                maDon: maDon,
+                type: 'DON_MOI',
+                title: 'Có đơn mới gần bạn',
+                content: '$maDon cần thu gom trong khung ${command.khungGio}.',
+                time: now,
+              ),
+            );
+          }
+        });
+        return FirestoreOrderMapper.fromMap(documentId: maDon, data: orderData);
+      } on OrderWorkflowException catch (error) {
+        if (error.code != 'dispatch-candidate-unavailable') rethrow;
+      }
+    }
+
+    throw const OrderWorkflowException(
+      'dispatch-failed',
+      'Không thể tạo và điều phối đơn.',
+    );
   }
 
   @override
@@ -350,6 +424,7 @@ class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
         'ngayCapNhat': Timestamp.fromDate(now),
       });
       transaction.update(staffRef, <String, dynamic>{
+        'trangThaiLamViec': 'DANG_THU_GOM',
         'phanCongDangChoId': FieldValue.delete(),
       });
       transaction.set(
@@ -413,13 +488,14 @@ class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
       );
       if (order.trangThai != 'CHO_XU_LY' ||
           order.nhanVienHienTaiId != null ||
+          order.nhanVienDeXuatId != command.nhanVienId ||
           order.nhanVienTuChoiIds.contains(command.nhanVienId)) {
         throw const OrderWorkflowException(
           'order-unavailable',
           'Đơn đã được nhân viên khác nhận hoặc không còn khả dụng.',
         );
       }
-      if (staffData['trangThaiLamViec'] != 'SAN_SANG') {
+      if (!{'SAN_SANG', 'DANG_RANH'}.contains(staffData['trangThaiLamViec'])) {
         throw const OrderWorkflowException(
           'staff-unavailable',
           'Nhân viên hiện không ở trạng thái sẵn sàng.',
@@ -432,7 +508,7 @@ class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
         );
       }
 
-      final attempt = (orderData['soLanDeXuat'] as num?)?.toInt() ?? 0;
+      final attempt = (orderData['soLanDeXuat'] as num?)?.toInt() ?? 1;
       transaction.set(assignmentRef, <String, dynamic>{
         'phanCongId': assignmentRef.id,
         'maDon': order.maDon,
@@ -441,18 +517,22 @@ class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
         'trangThaiPhanCong': AssignmentStatus.accepted.value,
         'thoiGianPhanCong': Timestamp.fromDate(now),
         'thoiGianHetHan': Timestamp.fromDate(now),
-        'thuTuDeXuat': attempt + 1,
+        'thuTuDeXuat': attempt,
         'thoiGianPhanHoi': Timestamp.fromDate(now),
         'ngayCapNhat': Timestamp.fromDate(now),
       });
       transaction.update(orderRef, <String, dynamic>{
         'nhanVienHienTaiId': command.nhanVienId,
         'phanCongHienTaiId': assignmentRef.id,
+        'nhanVienDeXuatId': FieldValue.delete(),
+        'offerExpiresAt': FieldValue.delete(),
         'gioChot': Timestamp.fromDate(command.gioChot),
         'trangThai': 'DA_NHAN',
-        'soLanDeXuat': attempt + 1,
         'dangChoHoTro': false,
         'ngayCapNhat': Timestamp.fromDate(now),
+      });
+      transaction.update(staffRef, <String, dynamic>{
+        'trangThaiLamViec': 'DANG_THU_GOM',
       });
       transaction.set(
         logRef,
@@ -491,64 +571,171 @@ class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
     }
 
     final orderRef = _orders.doc(command.maDon);
+    final previewSnapshot = await orderRef.get();
+    final previewData = previewSnapshot.data();
+    if (!previewSnapshot.exists || previewData == null) {
+      throw const OrderWorkflowException(
+        'order-not-found',
+        'Đơn thu gom không còn tồn tại.',
+      );
+    }
+    final previewOrder = FirestoreOrderMapper.fromMap(
+      documentId: previewSnapshot.id,
+      data: previewData,
+    );
+    if (previewOrder.trangThai != 'CHO_XU_LY' ||
+        previewOrder.nhanVienDeXuatId != command.nhanVienId) {
+      throw const OrderWorkflowException(
+        'order-unavailable',
+        'Đề xuất này không còn dành cho bạn.',
+      );
+    }
+    final addressSnapshot = await _firestore
+        .collection(diaChiCollection)
+        .doc(previewOrder.diaChiId)
+        .get();
+    final addressData = addressSnapshot.data();
+    final address = addressData == null
+        ? null
+        : _dispatchAddress(previewOrder.diaChiId, addressData);
+    final rejectedStaff = <String>{
+      ...previewOrder.nhanVienTuChoiIds,
+      command.nhanVienId,
+    }.toList();
+    final candidates = address == null
+        ? const <StaffProfile>[]
+        : await _rankedDispatchCandidates(
+            address: address,
+            timeSlot: previewOrder.khungGio,
+            rejectedStaffIds: rejectedStaff,
+          );
     final assignmentRef = _newDocument(phanCongThuGomCollection, 'PC');
     final logRef = _newDocument(lichSuHoatDongCollection, 'LOG');
     final now = _clock();
 
-    await _firestore.runTransaction((transaction) async {
-      final orderSnapshot = await transaction.get(orderRef);
-      final orderData = orderSnapshot.data();
-      if (!orderSnapshot.exists || orderData == null) {
-        throw const OrderWorkflowException(
-          'order-not-found',
-          'Đơn thu gom không còn tồn tại.',
-        );
-      }
-      final order = FirestoreOrderMapper.fromMap(
-        documentId: orderSnapshot.id,
-        data: orderData,
-      );
-      if (order.trangThai != 'CHO_XU_LY' ||
-          order.nhanVienHienTaiId != null ||
-          order.nhanVienTuChoiIds.contains(command.nhanVienId)) {
-        throw const OrderWorkflowException(
-          'order-unavailable',
-          'Đơn đã thay đổi hoặc đã được bỏ qua trước đó.',
-        );
-      }
+    for (final nextStaff in <StaffProfile?>[...candidates, null]) {
+      final nextNotificationRef = nextStaff == null
+          ? null
+          : _newDocument(thongBaoCollection, 'TB');
+      final customerNotificationRef = _newDocument(thongBaoCollection, 'TB');
+      try {
+        await _firestore.runTransaction((transaction) async {
+          final orderSnapshot = await transaction.get(orderRef);
+          final orderData = orderSnapshot.data();
+          if (!orderSnapshot.exists || orderData == null) {
+            throw const OrderWorkflowException(
+              'order-not-found',
+              'Đơn thu gom không còn tồn tại.',
+            );
+          }
+          final order = FirestoreOrderMapper.fromMap(
+            documentId: orderSnapshot.id,
+            data: orderData,
+          );
+          if (order.trangThai != 'CHO_XU_LY' ||
+              order.nhanVienHienTaiId != null ||
+              order.nhanVienDeXuatId != command.nhanVienId ||
+              order.nhanVienTuChoiIds.contains(command.nhanVienId)) {
+            throw const OrderWorkflowException(
+              'order-unavailable',
+              'Đơn đã thay đổi hoặc không còn dành cho bạn.',
+            );
+          }
+          if (nextStaff != null) {
+            final staffSnapshot = await transaction.get(
+              _firestore
+                  .collection(nhanVienThuGomCollection)
+                  .doc(nextStaff.nhanVienId),
+            );
+            if (!_isAvailableStaffData(staffSnapshot.data())) {
+              throw const OrderWorkflowException(
+                'dispatch-candidate-unavailable',
+                'Nhân viên kế tiếp vừa chuyển sang trạng thái bận.',
+              );
+            }
+          }
 
-      final rejectedStaff = [...order.nhanVienTuChoiIds, command.nhanVienId];
-      final attempt = (orderData['soLanDeXuat'] as num?)?.toInt() ?? 0;
-      transaction.set(assignmentRef, <String, dynamic>{
-        'phanCongId': assignmentRef.id,
-        'maDon': order.maDon,
-        'nhanVienId': command.nhanVienId,
-        'nguonPhanCong': AssignmentSource.system.value,
-        'trangThaiPhanCong': AssignmentStatus.rejected.value,
-        'thoiGianPhanCong': Timestamp.fromDate(now),
-        'thoiGianHetHan': Timestamp.fromDate(now),
-        'thuTuDeXuat': attempt + 1,
-        'thoiGianPhanHoi': Timestamp.fromDate(now),
-        'lyDoTuChoi': reason,
-        'ngayCapNhat': Timestamp.fromDate(now),
-      });
-      transaction.update(orderRef, <String, dynamic>{
-        'nhanVienTuChoiIds': rejectedStaff,
-        'soLanDeXuat': attempt + 1,
-        'ngayCapNhat': Timestamp.fromDate(now),
-      });
-      transaction.set(
-        logRef,
-        _activityData(
-          ref: logRef,
-          maDon: order.maDon,
-          userId: command.nhanVienId,
-          action: 'Bỏ qua đơn',
-          note: reason,
-          time: now,
-        ),
-      );
-    });
+          final attempt = (orderData['soLanDeXuat'] as num?)?.toInt() ?? 1;
+          transaction.set(assignmentRef, <String, dynamic>{
+            'phanCongId': assignmentRef.id,
+            'maDon': order.maDon,
+            'nhanVienId': command.nhanVienId,
+            'nguonPhanCong': AssignmentSource.system.value,
+            'trangThaiPhanCong': AssignmentStatus.rejected.value,
+            'thoiGianPhanCong': Timestamp.fromDate(now),
+            'thoiGianHetHan': Timestamp.fromDate(now),
+            'thuTuDeXuat': attempt,
+            'thoiGianPhanHoi': Timestamp.fromDate(now),
+            'lyDoTuChoi': reason,
+            'ngayCapNhat': Timestamp.fromDate(now),
+          });
+          transaction.update(orderRef, <String, dynamic>{
+            'nhanVienTuChoiIds': rejectedStaff,
+            if (nextStaff == null)
+              'nhanVienDeXuatId': FieldValue.delete()
+            else
+              'nhanVienDeXuatId': nextStaff.nhanVienId,
+            if (nextStaff == null)
+              'offerExpiresAt': FieldValue.delete()
+            else
+              'offerExpiresAt': Timestamp.fromDate(now.add(_offerValidity)),
+            'soLanDeXuat': attempt + (nextStaff == null ? 0 : 1),
+            'dangChoHoTro': nextStaff == null,
+            'ngayCapNhat': Timestamp.fromDate(now),
+          });
+          transaction.set(
+            logRef,
+            _activityData(
+              ref: logRef,
+              maDon: order.maDon,
+              userId: command.nhanVienId,
+              action: 'Từ chối đơn',
+              note: reason,
+              time: now,
+            ),
+          );
+          if (nextStaff != null && nextNotificationRef != null) {
+            transaction.set(
+              nextNotificationRef,
+              _notificationData(
+                ref: nextNotificationRef,
+                recipientId: nextStaff.nhanVienId,
+                maDon: order.maDon,
+                type: 'DON_MOI',
+                title: 'Có đơn mới gần bạn',
+                content:
+                    '${order.maDon} cần thu gom trong khung ${order.khungGio}.',
+                time: now,
+              ),
+            );
+          }
+          transaction.set(
+            customerNotificationRef,
+            _notificationData(
+              ref: customerNotificationRef,
+              recipientId: order.khachHangId,
+              maDon: order.maDon,
+              type: nextStaff == null ? 'CHO_HO_TRO' : 'TIM_NV_KHAC',
+              title: nextStaff == null
+                  ? 'Đơn đang chờ hỗ trợ'
+                  : 'Đang tìm nhân viên khác',
+              content: nextStaff == null
+                  ? 'Chưa còn nhân viên phù hợp cho ${order.maDon}.'
+                  : '${order.maDon} đã được chuyển đến nhân viên phù hợp tiếp theo.',
+              time: now,
+            ),
+          );
+        });
+        return;
+      } on OrderWorkflowException catch (error) {
+        if (error.code != 'dispatch-candidate-unavailable') rethrow;
+      }
+    }
+
+    throw const OrderWorkflowException(
+      'dispatch-failed',
+      'Không thể chuyển đơn đến nhân viên tiếp theo.',
+    );
   }
 
   @override
@@ -1198,6 +1385,92 @@ class FirestoreOrderWorkflowRepository implements OrderWorkflowRepository {
         );
       }
     });
+  }
+
+  Future<List<StaffProfile>> _rankedDispatchCandidates({
+    required CustomerAddress address,
+    required String timeSlot,
+    required List<String> rejectedStaffIds,
+  }) async {
+    final snapshot = await _firestore
+        .collection(nhanVienThuGomCollection)
+        .where('trangThaiLamViec', whereIn: const ['SAN_SANG', 'DANG_RANH'])
+        .get();
+    final candidates = <StaffProfile>[];
+    for (final document in snapshot.docs) {
+      final data = document.data();
+      final staffId = _stringValue(data['nhanVienId'], document.id);
+      if (rejectedStaffIds.contains(staffId)) continue;
+      final profile = StaffProfile(
+        nhanVienId: staffId,
+        maNhanVien: _stringValue(data['maNhanVien'], staffId),
+        trangThaiLamViec: _stringValue(data['trangThaiLamViec'], 'TAM_NGHI'),
+        gioBatDau: _stringValue(data['gioBatDau'], '06:00'),
+        gioKetThuc: _stringValue(data['gioKetThuc'], '17:00'),
+        doanhThuHienTai: data['doanhThuHienTai'] is num
+            ? data['doanhThuHienTai'] as num
+            : 0,
+        viTriHienTai: _stringValue(data['viTriHienTai'], ''),
+        toaDoLat: _numberValue(data['toaDoLat']),
+        toaDoLng: _numberValue(data['toaDoLng']),
+        capNhatViTriLuc: data['capNhatViTriLuc'] is Timestamp
+            ? (data['capNhatViTriLuc'] as Timestamp).toDate()
+            : null,
+      );
+      if (_staffCanCoverSlot(profile, timeSlot)) {
+        candidates.add(profile);
+      }
+    }
+    candidates.sort(
+      (first, second) => compareStaffForPickup(first, second, address),
+    );
+    return candidates;
+  }
+
+  CustomerAddress _dispatchAddress(
+    String addressId,
+    Map<String, dynamic> data,
+  ) {
+    return CustomerAddress(
+      diaChiId: _stringValue(data['diaChiId'], addressId),
+      khachHangId: _stringValue(data['khachHangId'], ''),
+      diaChiChiTiet: _stringValue(data['diaChiChiTiet'], ''),
+      phuongXa: _stringValue(data['phuongXa'], ''),
+      quanHuyen: _stringValue(data['quanHuyen'], ''),
+      tinhThanh: _stringValue(data['tinhThanh'], ''),
+      toaDoLat: _numberValue(data['toaDoLat']) ?? 0,
+      toaDoLng: _numberValue(data['toaDoLng']) ?? 0,
+      macDinh: data['macDinh'] == true,
+    );
+  }
+
+  bool _staffCanCoverSlot(StaffProfile staff, String timeSlot) {
+    final slot = timeSlot.split('-');
+    if (slot.length != 2) return false;
+    final slotStart = _minutes(slot.first);
+    final slotEnd = _minutes(slot.last);
+    final workStart = _minutes(staff.gioBatDau);
+    final workEnd = _minutes(staff.gioKetThuc);
+    if (slotStart == null ||
+        slotEnd == null ||
+        workStart == null ||
+        workEnd == null) {
+      return false;
+    }
+    return slotStart >= workStart && slotEnd <= workEnd;
+  }
+
+  bool _isAvailableStaffData(Map<String, dynamic>? data) {
+    return data != null &&
+        {'SAN_SANG', 'DANG_RANH'}.contains(data['trangThaiLamViec']);
+  }
+
+  String _stringValue(Object? value, String fallback) {
+    return value is String && value.trim().isNotEmpty ? value.trim() : fallback;
+  }
+
+  double? _numberValue(Object? value) {
+    return value is num ? value.toDouble() : null;
   }
 
   double _distanceMeters(

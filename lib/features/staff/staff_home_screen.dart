@@ -1,13 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
-import '../reference_data/application/reference_data_providers.dart';
 import '../../models/app_models.dart';
 import '../../providers/app_providers.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/dashboard_shell.dart';
+import '../../shared/widgets/home_dashboard_widgets.dart';
 import '../orders/presentation/order_history_screen.dart';
+import '../reference_data/application/reference_data_providers.dart';
+import 'domain/staff_availability.dart';
 import 'order/staff_order_flow.dart';
 import 'staff_order_screen.dart';
 
@@ -18,123 +22,159 @@ class StaffHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     if (user == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: AppLoadingView(message: 'Đang tải ca thu gom...'),
+      );
     }
+
     final offers = ref.watch(staffOfferOrdersProvider);
-    final orders = ref.watch(staffOrdersProvider);
+    final activeOrders = ref.watch(staffOrdersProvider);
     final history = ref.watch(staffOrderHistoryProvider);
-    final staffProfile = _findStaff(
-      ref.watch(staffProfilesProvider),
-      user.userId,
-    );
+    final profile = _findStaff(ref.watch(staffProfilesProvider), user.userId);
     final addresses = ref.watch(allAddressesProvider);
     final wastes = ref.watch(wasteTypesProvider);
     final users = ref.watch(usersProvider);
 
-    return AppPage(
-      maxWidth: 760,
-      title: 'Ca thu gom',
-      subtitle:
-          '${staffProfile?.maNhanVien ?? user.hoTen} • ${staffProfile?.gioBatDau ?? '06:00'}-${staffProfile?.gioKetThuc ?? '17:00'}',
+    void openHistory() {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              const OrderHistoryScreen(audience: OrderHistoryAudience.staff),
+        ),
+      );
+    }
+
+    return DashboardShell(
+      maxContentWidth: 1160,
+      drawer: _StaffDrawer(
+        user: user,
+        profile: profile,
+        onLogout: () async {
+          await ref.read(firebaseAuthenticationServiceProvider).signOut();
+          ref.read(currentSessionProvider.notifier).state = null;
+        },
+      ),
+      destinations: [
+        DashboardDestination(
+          icon: Icons.space_dashboard_outlined,
+          selectedIcon: Icons.space_dashboard_rounded,
+          label: 'Ca làm',
+          onSelected: () {},
+        ),
+        DashboardDestination(
+          icon: Icons.history_outlined,
+          selectedIcon: Icons.history_rounded,
+          label: 'Lịch sử',
+          onSelected: openHistory,
+        ),
+      ],
       actions: [
         IconButton(
-          tooltip: 'Đăng xuất',
-          onPressed: () async {
-            await ref.read(firebaseAuthenticationServiceProvider).signOut();
-            ref.read(currentSessionProvider.notifier).state = null;
-          },
-          icon: const Icon(Icons.logout),
+          tooltip: 'Lịch sử công việc',
+          onPressed: openHistory,
+          icon: const Icon(Icons.history_rounded),
         ),
+        const SizedBox(width: AppSpacing.sm),
       ],
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 680;
-          final padding = const EdgeInsets.fromLTRB(
-            AppSpacing.screenHorizontal,
-            AppSpacing.md,
-            AppSpacing.screenHorizontal,
-            AppSpacing.xxl,
-          );
-
-          if (wide) {
-            return ListView(
-              padding: padding,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          final wide = constraints.maxWidth >= 860;
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  wide ? AppSpacing.xxl : AppSpacing.screenHorizontal,
+                  AppSpacing.xl,
+                  wide ? AppSpacing.xxl : AppSpacing.screenHorizontal,
+                  AppSpacing.xxxl,
+                ),
+                sliver: SliverList.list(
                   children: [
-                    Expanded(
-                      child: _StaffShiftPanel(
-                        profile: staffProfile,
-                        offerCount: offers.length,
-                        activeCount: orders.length,
-                        onToggleAvailability: staffProfile == null
-                            ? null
-                            : () => _toggleAvailability(
-                                context,
-                                ref,
-                                staffProfile,
-                              ),
-                      ),
+                    _StaffGreeting(user: user, profile: profile),
+                    const SizedBox(height: AppSpacing.lg),
+                    _ShiftControl(
+                      profile: profile,
+                      activeOrderCount: activeOrders.length,
+                      onToggle: profile == null
+                          ? null
+                          : () => _toggleAvailability(
+                              context,
+                              ref,
+                              profile,
+                              hasActiveOrder: activeOrders.isNotEmpty,
+                            ),
                     ),
-                    const SizedBox(width: AppSpacing.lg),
-                    Expanded(
-                      child: _StaffOfferPanel(
-                        offers: offers,
+                    const SizedBox(height: AppSpacing.lg),
+                    _OperationStats(
+                      offerCount: offers.length,
+                      activeCount: activeOrders.length,
+                      completedCount: history
+                          .where((order) => order.trangThai == 'HOAN_THANH')
+                          .length,
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    if (wide)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 7,
+                            child: Column(
+                              children: [
+                                _ActiveMissionSection(
+                                  orders: activeOrders,
+                                  addresses: addresses,
+                                  wastes: wastes,
+                                ),
+                                if (activeOrders.isEmpty) ...[
+                                  const SizedBox(height: AppSpacing.xxl),
+                                  _OfferInbox(
+                                    offers: offers,
+                                    addresses: addresses,
+                                    wastes: wastes,
+                                    users: users,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xl),
+                          Expanded(
+                            flex: 4,
+                            child: _StaffHistorySection(
+                              orders: history.take(2).toList(),
+                              addresses: addresses,
+                              wastes: wastes,
+                              onViewAll: openHistory,
+                            ),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      _ActiveMissionSection(
+                        orders: activeOrders,
                         addresses: addresses,
                         wastes: wastes,
-                        users: users,
                       ),
-                    ),
+                      if (activeOrders.isEmpty) ...[
+                        const SizedBox(height: AppSpacing.xxl),
+                        _OfferInbox(
+                          offers: offers,
+                          addresses: addresses,
+                          wastes: wastes,
+                          users: users,
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.xxl),
+                      _StaffHistorySection(
+                        orders: history.take(2).toList(),
+                        addresses: addresses,
+                        wastes: wastes,
+                        onViewAll: openHistory,
+                      ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: AppSpacing.sectionGap),
-                _AcceptedOrdersList(
-                  orders: orders,
-                  addresses: addresses,
-                  wastes: wastes,
-                ),
-                const SizedBox(height: AppSpacing.sectionGap),
-                _OrderHistoryList(
-                  orders: history,
-                  addresses: addresses,
-                  wastes: wastes,
-                  onViewHistory: () => _openHistory(context),
-                ),
-              ],
-            );
-          }
-
-          return ListView(
-            padding: padding,
-            children: [
-              _StaffShiftPanel(
-                profile: staffProfile,
-                offerCount: offers.length,
-                activeCount: orders.length,
-                onToggleAvailability: staffProfile == null
-                    ? null
-                    : () => _toggleAvailability(context, ref, staffProfile),
-              ),
-              const SizedBox(height: AppSpacing.sectionGap),
-              _StaffOfferPanel(
-                offers: offers,
-                addresses: addresses,
-                wastes: wastes,
-                users: users,
-              ),
-              const SizedBox(height: AppSpacing.sectionGap),
-              _AcceptedOrdersList(
-                orders: orders,
-                addresses: addresses,
-                wastes: wastes,
-              ),
-              const SizedBox(height: AppSpacing.sectionGap),
-              _OrderHistoryList(
-                orders: history,
-                addresses: addresses,
-                wastes: wastes,
-                onViewHistory: () => _openHistory(context),
               ),
             ],
           );
@@ -143,21 +183,13 @@ class StaffHomeScreen extends ConsumerWidget {
     );
   }
 
-  void _openHistory(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            const OrderHistoryScreen(audience: OrderHistoryAudience.staff),
-      ),
-    );
-  }
-
   Future<void> _toggleAvailability(
     BuildContext context,
     WidgetRef ref,
-    StaffProfile profile,
-  ) async {
-    if (profile.trangThaiLamViec == 'DANG_THU_GOM') {
+    StaffProfile profile, {
+    required bool hasActiveOrder,
+  }) async {
+    if (hasActiveOrder) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Hãy hoàn tất hoặc hủy công việc đang xử lý trước.'),
@@ -166,9 +198,7 @@ class StaffHomeScreen extends ConsumerWidget {
       return;
     }
 
-    final nextStatus = profile.trangThaiLamViec == 'SAN_SANG'
-        ? 'TAM_NGHI'
-        : 'SAN_SANG';
+    final nextStatus = nextStaffAvailabilityStatus(profile.trangThaiLamViec);
     if (ref.read(firebaseEnabledProvider)) {
       try {
         await ref
@@ -177,17 +207,36 @@ class StaffHomeScreen extends ConsumerWidget {
               staffId: profile.nhanVienId,
               status: nextStatus,
             );
+        ref.invalidate(firestoreStaffProfilesProvider);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                nextStatus == 'SAN_SANG'
+                    ? 'Đã bật nhận đơn.'
+                    : 'Đã tạm dừng nhận đơn.',
+              ),
+            ),
+          );
+        }
+      } on FirebaseException catch (error) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_availabilityErrorMessage(error.code))),
+          );
+        }
       } catch (_) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Khong the cap nhat trang thai lam viec.'),
+              content: Text('Không thể cập nhật trạng thái nhận đơn.'),
             ),
           );
         }
       }
       return;
     }
+
     ref
         .read(staffProfileControllerProvider.notifier)
         .setWorkStatus(profile.nhanVienId, nextStatus);
@@ -199,122 +248,241 @@ class StaffHomeScreen extends ConsumerWidget {
       ref.read(orderControllerProvider.notifier).retryWaitingOrders();
     }
   }
+
+  String _availabilityErrorMessage(String code) {
+    return switch (code) {
+      'permission-denied' =>
+        'Firestore chưa cho phép cập nhật trạng thái nhân viên.',
+      'not-found' => 'Không tìm thấy hồ sơ nhân viên theo UID đăng nhập.',
+      'unavailable' => 'Mất kết nối Firestore. Vui lòng thử lại.',
+      _ => 'Không thể bật nhận đơn ($code).',
+    };
+  }
 }
 
-class _StaffShiftPanel extends StatelessWidget {
-  const _StaffShiftPanel({
-    required this.profile,
-    required this.offerCount,
-    required this.activeCount,
-    required this.onToggleAvailability,
-  });
+class _StaffGreeting extends StatelessWidget {
+  const _StaffGreeting({required this.user, required this.profile});
 
+  final AppUser user;
   final StaffProfile? profile;
-  final int offerCount;
-  final int activeCount;
-  final VoidCallback? onToggleAvailability;
 
   @override
   Widget build(BuildContext context) {
-    final workStatus = profile?.trangThaiLamViec ?? 'TAM_NGHI';
-    final isAvailable = workStatus == 'SAN_SANG';
-    final isBusy = workStatus == 'DANG_THU_GOM';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
       children: [
-        HomeBrandHeader(
-          title: isBusy
-              ? 'Đang thực hiện thu gom'
-              : isAvailable
-              ? 'Sẵn sàng nhận đơn'
-              : 'Đang tạm ngừng nhận đơn',
-          subtitle:
-              '${profile?.viTriHienTai ?? 'Chưa cập nhật vị trí'} • ${profile?.gioBatDau ?? '06:00'}-${profile?.gioKetThuc ?? '17:00'}',
-          trailing: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.opacity(AppColors.white, 0.14),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.accent),
-            ),
-            child: const Icon(
-              Icons.badge_outlined,
-              color: AppColors.textInverse,
-            ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'CA THU GOM HÔM NAY',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.textMuted,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                profile?.maNhanVien ?? user.hoTen,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            Expanded(
-              child: MetricCard(
-                label: 'Đơn mới',
-                value: offerCount.toString(),
-                icon: Icons.notifications_active_outlined,
-                color: AppColors.accent,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: MetricCard(
-                label: 'Đang xử lý',
-                value: activeCount.toString(),
-                icon: Icons.route_outlined,
-                color: AppColors.primaryDark,
-              ),
-            ),
-          ],
+        CircleAvatar(
+          radius: 23,
+          backgroundColor: AppColors.green100,
+          foregroundColor: AppColors.primaryDark,
+          child: const Icon(Icons.badge_rounded),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceAlt,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: const Icon(
-                    Icons.my_location_outlined,
-                    color: AppColors.primaryDark,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Vị trí nhận đơn',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
+      ],
+    );
+  }
+}
+
+class _ShiftControl extends StatelessWidget {
+  const _ShiftControl({
+    required this.profile,
+    required this.activeOrderCount,
+    required this.onToggle,
+  });
+
+  final StaffProfile? profile;
+  final int activeOrderCount;
+  final VoidCallback? onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = profile?.trangThaiLamViec ?? 'TAM_NGHI';
+    final available = isStaffAvailable(status);
+    final locked = activeOrderCount > 0;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      decoration: BoxDecoration(
+        gradient: AppGradients.hero,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+          final statusLabel = locked
+              ? 'Đang trong chuyến'
+              : available
+              ? 'Trực tuyến'
+              : 'Tạm nghỉ';
+          final statusControl = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                statusLabel,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: AppColors.textInverse),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Switch(
+                value: available,
+                onChanged: locked || onToggle == null
+                    ? null
+                    : (_) => onToggle!(),
+              ),
+            ],
+          );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (compact) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        statusLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: AppColors.textInverse,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        profile?.viTriHienTai ?? 'Chưa cập nhật',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Switch(
+                      value: available,
+                      onChanged: locked || onToggle == null
+                          ? null
+                          : (_) => onToggle!(),
+                    ),
+                  ],
                 ),
-                Switch(
-                  value: isAvailable,
-                  onChanged: isBusy || onToggleAvailability == null
-                      ? null
-                      : (_) => onToggleAvailability!(),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          locked
+                              ? 'Bạn đang thực hiện thu gom'
+                              : available
+                              ? 'Sẵn sàng nhận đơn mới'
+                              : 'Đã tạm dừng nhận đơn',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: AppColors.textInverse,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          '${profile?.gioBatDau ?? '06:00'}-${profile?.gioKetThuc ?? '17:00'} • ${profile?.viTriHienTai ?? 'Chưa cập nhật vị trí'}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.textInverseMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!compact) ...[
+                    const SizedBox(width: AppSpacing.xl),
+                    statusControl,
+                  ],
+                ],
+              ),
+              if (locked) ...[
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.lock_rounded,
+                      size: 16,
+                      color: AppColors.textInverseMuted,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Nhận đơn mới được khóa đến khi công việc hiện tại hoàn tất.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textInverseMuted,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
-            ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _OperationStats extends StatelessWidget {
+  const _OperationStats({
+    required this.offerCount,
+    required this.activeCount,
+    required this.completedCount,
+  });
+
+  final int offerCount;
+  final int activeCount;
+  final int completedCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _StatTile(
+            label: 'Đơn mới',
+            value: offerCount.toString(),
+            icon: Icons.notifications_active_rounded,
+            color: AppColors.warning,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _StatTile(
+            label: 'Đang làm',
+            value: activeCount.toString(),
+            icon: Icons.route_rounded,
+            color: AppColors.processing,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _StatTile(
+            label: 'Hoàn tất',
+            value: completedCount.toString(),
+            icon: Icons.task_alt_rounded,
+            color: AppColors.success,
           ),
         ),
       ],
@@ -322,8 +490,163 @@ class _StaffShiftPanel extends StatelessWidget {
   }
 }
 
-class _StaffOfferPanel extends ConsumerWidget {
-  const _StaffOfferPanel({
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 19, color: color),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActiveMissionSection extends StatelessWidget {
+  const _ActiveMissionSection({
+    required this.orders,
+    required this.addresses,
+    required this.wastes,
+  });
+
+  final List<PickupOrder> orders;
+  final List<CustomerAddress> addresses;
+  final List<WasteType> wastes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(
+          title: 'Nhiệm vụ hiện tại',
+          subtitle: 'Công việc cần ưu tiên trong ca',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (orders.isEmpty)
+          const EmptyState(
+            icon: Icons.route_outlined,
+            title: 'Chưa có nhiệm vụ',
+            message: 'Đơn bạn nhận sẽ xuất hiện tại đây.',
+          )
+        else
+          ...orders.map(
+            (order) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _ActiveMissionCard(
+                order: order,
+                address: _findAddress(addresses, order.diaChiId),
+                waste: _findWaste(wastes, order.loaiRacId),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ActiveMissionCard extends StatelessWidget {
+  const _ActiveMissionCard({
+    required this.order,
+    required this.address,
+    required this.waste,
+  });
+
+  final PickupOrder order;
+  final CustomerAddress? address;
+  final WasteType? waste;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.green300, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  formatOrderCode(order.maDon),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              StatusChip(status: order.trangThai, compact: true),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          OrderJourneyBar(status: order.trangThai),
+          const SizedBox(height: AppSpacing.lg),
+          _MissionFact(
+            icon: Icons.recycling_rounded,
+            value:
+                '${waste?.tenLoaiRac ?? order.loaiRacId} • ${formatKg(order.khoiLuongDuKien)}',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _MissionFact(
+            icon: Icons.location_on_rounded,
+            value: address?.shortAddress ?? order.diaChiId,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _openStaffOrder(context, order),
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: const Text('Tiếp tục xử lý'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OfferInbox extends ConsumerWidget {
+  const _OfferInbox({
     required this.offers,
     required this.addresses,
     required this.wastes,
@@ -341,35 +664,32 @@ class _StaffOfferPanel extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          title: 'Đơn đang chờ nhận',
-          subtitle: 'Nhân viên phù hợp nhận trước sẽ phụ trách đơn',
+          title: 'Hộp đơn mới',
+          subtitle: 'Nhận đơn phù hợp với vị trí và ca làm',
           trailing: Text(
             '${offers.length} đơn',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: AppColors.primary,
               fontWeight: FontWeight.w800,
             ),
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.md),
         if (offers.isEmpty)
           const EmptyState(
-            icon: Icons.notifications_none,
+            icon: Icons.notifications_none_rounded,
             title: 'Chưa có đơn mới',
-            message: 'Khi khách gần khu vực đặt lịch, đơn sẽ hiện tại đây.',
+            message: 'Đơn gần khu vực sẽ tự xuất hiện tại đây.',
           )
         else
-          ...offers.map((order) {
-            final address = _findAddress(addresses, order.diaChiId);
-            final waste = _findWaste(wastes, order.loaiRacId);
-            final customer = _findUser(users, order.khachHangId);
-            return Padding(
+          ...offers.map(
+            (order) => Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: _OfferCard(
                 order: order,
-                address: address,
-                waste: waste,
-                customer: customer,
+                address: _findAddress(addresses, order.diaChiId),
+                waste: _findWaste(wastes, order.loaiRacId),
+                customer: _findUser(users, order.khachHangId),
                 onReject: () async {
                   final user = ref.read(currentUserProvider);
                   if (user == null) return;
@@ -390,15 +710,11 @@ class _StaffOfferPanel extends ConsumerWidget {
                     staffId: user.userId,
                   );
                   if (!context.mounted || !accepted) return;
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => StaffOrderScreen(maDon: order.maDon),
-                    ),
-                  );
+                  _openStaffOrder(context, order);
                 },
               ),
-            );
-          }),
+            ),
+          ),
       ],
     );
   }
@@ -423,148 +739,126 @@ class _OfferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentAddress = address;
-
-    return Card(
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: const BorderSide(color: AppColors.primary, width: 1.1),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: const Icon(
-                    Icons.recycling,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(top: 4),
+                decoration: const BoxDecoration(
+                  color: AppColors.accent,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              order.maDon,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                          const StatusChip(status: 'CHO_XU_LY', compact: true),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        '${formatDayMonth(order.ngayThuGom)} • ${order.khungGio}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.muted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _OfferInfoRow(
-              icon: Icons.person_outline,
-              text: customer?.hoTen ?? order.khachHangId,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _OfferInfoRow(
-              icon: Icons.delete_outline,
-              text:
-                  '${waste?.tenLoaiRac ?? order.loaiRacId} • ${formatKg(order.khoiLuongDuKien)}',
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _OfferInfoRow(
-              icon: Icons.place_outlined,
-              text: currentAddress == null
-                  ? order.diaChiId
-                  : '${currentAddress.shortAddress}, ${currentAddress.quanHuyen}',
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Đơn mở cho nhân viên đang sẵn sàng',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.secondary,
-                fontWeight: FontWeight.w700,
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onReject,
-                    icon: const Icon(Icons.close_outlined),
-                    label: const Text('Bỏ qua'),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'YÊU CẦU MỚI',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.7,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  flex: 2,
-                  child: FilledButton.icon(
-                    onPressed: onAccept,
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Nhận đơn'),
-                  ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                '${formatDayMonth(order.ngayThuGom)} • ${order.khungGio}',
+                maxLines: 2,
+                textAlign: TextAlign.right,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            customer?.hoTen ?? order.khachHangId,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _MissionFact(
+            icon: Icons.recycling_rounded,
+            value:
+                '${waste?.tenLoaiRac ?? order.loaiRacId} • ${formatKg(order.khoiLuongDuKien)}',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _MissionFact(
+            icon: Icons.location_on_rounded,
+            value: address == null
+                ? order.diaChiId
+                : '${address!.shortAddress}, ${address!.quanHuyen}',
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onReject,
+                  child: const Text('Từ chối'),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                flex: 2,
+                child: FilledButton.icon(
+                  onPressed: onAccept,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Nhận đơn'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _AcceptedOrdersList extends StatelessWidget {
-  const _AcceptedOrdersList({
+class _StaffHistorySection extends StatelessWidget {
+  const _StaffHistorySection({
     required this.orders,
     required this.addresses,
     required this.wastes,
+    required this.onViewAll,
   });
 
   final List<PickupOrder> orders;
   final List<CustomerAddress> addresses;
   final List<WasteType> wastes;
+  final VoidCallback onViewAll;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(
-          title: 'Đơn đang xử lý',
-          subtitle: 'Các đơn bạn đã nhận trong ca',
+        SectionHeader(
+          title: 'Đã xử lý',
+          subtitle: 'Công việc gần nhất',
+          trailing: TextButton(
+            onPressed: onViewAll,
+            child: const Text('Xem tất cả'),
+          ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.md),
         if (orders.isEmpty)
           const EmptyState(
-            icon: Icons.assignment_turned_in_outlined,
-            title: 'Chưa nhận đơn nào',
-            message: 'Sau khi bấm nhận đơn, đơn sẽ chuyển xuống danh sách này.',
+            icon: Icons.history_rounded,
+            title: 'Chưa có lịch sử',
+            message: 'Đơn đã xử lý sẽ xuất hiện tại đây.',
           )
         else
           ...orders.map(
@@ -574,13 +868,7 @@ class _AcceptedOrdersList extends StatelessWidget {
                 order: order,
                 address: _findAddress(addresses, order.diaChiId),
                 wasteType: _findWaste(wastes, order.loaiRacId),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => StaffOrderScreen(maDon: order.maDon),
-                    ),
-                  );
-                },
+                onTap: () => _openStaffOrder(context, order),
               ),
             ),
           ),
@@ -589,89 +877,86 @@ class _AcceptedOrdersList extends StatelessWidget {
   }
 }
 
-class _OrderHistoryList extends StatelessWidget {
-  const _OrderHistoryList({
-    required this.orders,
-    required this.addresses,
-    required this.wastes,
-    required this.onViewHistory,
-  });
-
-  final List<PickupOrder> orders;
-  final List<CustomerAddress> addresses;
-  final List<WasteType> wastes;
-  final VoidCallback onViewHistory;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionHeader(
-          title: 'Đã xử lý trong ca',
-          subtitle: 'Đơn hoàn tất hoặc đã hủy',
-          trailing: TextButton.icon(
-            onPressed: onViewHistory,
-            icon: const Icon(Icons.history_outlined, size: 17),
-            label: const Text('Xem lịch sử'),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        if (orders.isEmpty)
-          const EmptyState(
-            icon: Icons.history_outlined,
-            title: 'Chưa có đơn đã xử lý',
-            message: 'Các đơn hoàn tất hoặc đã hủy sẽ hiện tại đây.',
-          )
-        else
-          ...orders
-              .take(2)
-              .map(
-                (order) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: OrderCard(
-                    order: order,
-                    address: _findAddress(addresses, order.diaChiId),
-                    wasteType: _findWaste(wastes, order.loaiRacId),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => StaffOrderScreen(maDon: order.maDon),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-      ],
-    );
-  }
-}
-
-class _OfferInfoRow extends StatelessWidget {
-  const _OfferInfoRow({required this.icon, required this.text});
+class _MissionFact extends StatelessWidget {
+  const _MissionFact({required this.icon, required this.value});
 
   final IconData icon;
-  final String text;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 17, color: AppColors.primaryDark),
+        Icon(icon, size: 18, color: AppColors.textMuted),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Text(
-            text,
+            value,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.text),
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StaffDrawer extends StatelessWidget {
+  const _StaffDrawer({
+    required this.user,
+    required this.profile,
+    required this.onLogout,
+  });
+
+  final AppUser user;
+  final StaffProfile? profile;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      backgroundColor: AppColors.surface,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const BrandLogo(logoSize: 40),
+                  const SizedBox(height: AppSpacing.xxl),
+                  Text(
+                    user.hoTen,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    profile?.maNhanVien ?? user.email,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            const ListTile(
+              leading: Icon(Icons.badge_outlined),
+              title: Text('Thông tin ca làm'),
+            ),
+            const Spacer(),
+            ListTile(
+              leading: const Icon(Icons.logout_rounded),
+              title: const Text('Đăng xuất'),
+              onTap: onLogout,
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -702,4 +987,10 @@ AppUser? _findUser(List<AppUser> users, String id) {
     if (user.userId == id) return user;
   }
   return null;
+}
+
+void _openStaffOrder(BuildContext context, PickupOrder order) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => StaffOrderScreen(maDon: order.maDon)),
+  );
 }

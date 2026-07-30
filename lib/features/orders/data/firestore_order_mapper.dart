@@ -19,7 +19,9 @@ class FirestoreOrderMapper {
       loaiRacId: _requiredString(data, 'loaiRacId'),
       nhanVienHienTaiId: _optionalString(data, 'nhanVienHienTaiId'),
       phanCongHienTaiId: _optionalString(data, 'phanCongHienTaiId'),
+      nhanVienDeXuatId: _optionalString(data, 'nhanVienDeXuatId'),
       nhanVienTuChoiIds: _optionalStringList(data, 'nhanVienTuChoiIds'),
+      offerExpiresAt: _optionalDate(data, 'offerExpiresAt'),
       offerAttempt: _optionalInt(data, 'soLanDeXuat') ?? 0,
       waitingForSupport: data['dangChoHoTro'] == true,
       khoiLuongDuKien: _requiredNumber(data, 'khoiLuongDuKien').toDouble(),
@@ -41,6 +43,8 @@ class FirestoreOrderMapper {
     required String maDon,
     required CreatePickupOrderCommand command,
     required DateTime now,
+    String? suggestedStaffId,
+    DateTime? offerExpiresAt,
   }) {
     return <String, dynamic>{
       'maDon': maDon,
@@ -54,8 +58,11 @@ class FirestoreOrderMapper {
       'trangThai': 'CHO_XU_LY',
       'ghiChu': command.ghiChu.trim(),
       'nhanVienTuChoiIds': <String>[],
-      'soLanDeXuat': 0,
-      'dangChoHoTro': false,
+      'nhanVienDeXuatId': ?suggestedStaffId,
+      if (offerExpiresAt != null)
+        'offerExpiresAt': Timestamp.fromDate(offerExpiresAt),
+      'soLanDeXuat': suggestedStaffId == null ? 0 : 1,
+      'dangChoHoTro': suggestedStaffId == null,
       'ngayTao': Timestamp.fromDate(now),
       'ngayCapNhat': Timestamp.fromDate(now),
     };

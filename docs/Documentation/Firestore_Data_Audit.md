@@ -75,22 +75,25 @@ khoi tao Firebase runtime nhung cac screen hien tai van chay
 - File `firestore.rules` trong workspace da dung collection uppercase va hang
   cho don mo; van phai dry-run va review truoc khi deploy.
 
-## Open-Queue Persistence Cho Do An
+## Targeted Dispatch Persistence Cho Do An
 
-Phuong an nop mon dung hang cho don mo, khong dung Cloud Functions dispatcher:
+Phuong an nop mon gui don tuan tu, khong dung Cloud Functions dispatcher:
 
-- Don moi co `trangThai = CHO_XU_LY`; moi nhan vien dang san sang co the xem.
-- Nhan vien bam nhan se tao `PHAN_CONG_THU_GOM.DA_NHAN` va cap nhat
-  `DON_THU_GOM` trong cung transaction.
-- Nhan vien bam bo qua se tao `PHAN_CONG_THU_GOM.TU_CHOI` va them UID vao
-  `DON_THU_GOM.nhanVienTuChoiIds`.
-- Nhan vien dau tien commit transaction khi don van `CHO_XU_LY` se thang.
+- Don moi co `trangThai = CHO_XU_LY`; app xep hang nhan vien san sang theo
+  khoang cach GPS va fallback khu vuc/doanh thu/ID.
+- Chi nhan vien trong `nhanVienDeXuatId` duoc xem va phan hoi don.
+- Nhan vien bam nhan se tao `PHAN_CONG_THU_GOM.DA_NHAN`, cap nhat
+  `DON_THU_GOM`, va doi nhan vien sang `DANG_THU_GOM` trong cung transaction.
+- Nhan vien bam tu choi se tao `PHAN_CONG_THU_GOM.TU_CHOI`, them UID vao
+  `nhanVienTuChoiIds`, va gan `nhanVienDeXuatId` cho ung vien gan ke tiep.
+- Khi khong con ung vien, don giu `CHO_XU_LY` va `dangChoHoTro = true`.
 - `nguonPhanCong = HE_THONG`; admin override van dung `ADMIN`.
 - `CHO_PHAN_HOI` va `HET_HAN` chi can cho ban Functions nang cao, khong nam
   trong runtime co ban.
 
+`nhanVienDeXuatId` va `offerExpiresAt` ton tai khi dang cho phan hoi.
 `nhanVienHienTaiId` va `phanCongHienTaiId` chi duoc gan khi nhan thanh cong.
-`soLanDeXuat` duoc dung nhu bo dem phan hoi don trong ban co ban.
+`soLanDeXuat` dem so nhan vien da duoc gui de xuat.
 Khi hoan tat, `DON_THU_GOM.bienBanId` va `thanhToanId` tham chieu cac document
 duoc tao trong cung transaction. `DANG_KY_GOI.maDonCapNhatCuoi` cho phep Rules
 xac minh lan tru quota gói thang thuoc dung don.

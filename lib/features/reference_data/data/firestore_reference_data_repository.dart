@@ -13,15 +13,122 @@ class FirestoreReferenceDataRepository {
         .collection(diaChiCollection)
         .where('khachHangId', isEqualTo: customerId)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
+        .map((snapshot) {
+          final addresses = snapshot.docs
               .map((doc) => _addressFromMap(doc.id, doc.data()))
               .whereType<CustomerAddress>()
-              .where(
-                (address) => address.macDinh || address.diaChiId.isNotEmpty,
-              )
-              .toList(growable: false),
-        );
+              .toList();
+          addresses.sort((first, second) {
+            if (first.macDinh != second.macDinh) {
+              return first.macDinh ? -1 : 1;
+            }
+            return first.diaChiChiTiet.compareTo(second.diaChiChiTiet);
+          });
+          return addresses;
+        });
+  }
+
+  Future<String> saveCustomerAddress({
+    String? addressId,
+    required String customerId,
+    required String detail,
+    required String ward,
+    required String district,
+    required String city,
+    required double latitude,
+    required double longitude,
+    required bool isDefault,
+  }) async {
+    final collection = _firestore.collection(diaChiCollection);
+    final snapshot = await collection
+        .where('khachHangId', isEqualTo: customerId)
+        .get();
+    final reference = addressId == null
+        ? collection.doc()
+        : collection.doc(addressId);
+    QueryDocumentSnapshot<Map<String, dynamic>>? existing;
+    for (final document in snapshot.docs) {
+      if (document.id == reference.id) {
+        existing = document;
+        break;
+      }
+    }
+    if (addressId != null && existing == null) {
+      throw StateError('Địa chỉ không còn tồn tại.');
+    }
+    final shouldBeDefault =
+        isDefault ||
+        snapshot.docs.isEmpty ||
+        existing?.data()['macDinh'] == true;
+    final batch = _firestore.batch();
+    if (shouldBeDefault) {
+      for (final document in snapshot.docs) {
+        if (document.id != reference.id && document.data()['macDinh'] == true) {
+          batch.update(document.reference, {'macDinh': false});
+        }
+      }
+    }
+    batch.set(reference, {
+      'diaChiId': reference.id,
+      'khachHangId': customerId,
+      'diaChiChiTiet': detail,
+      'phuongXa': ward,
+      'quanHuyen': district,
+      'tinhThanh': city,
+      'toaDoLat': latitude,
+      'toaDoLng': longitude,
+      'macDinh': shouldBeDefault,
+      'trangThai': 'ACTIVE',
+    });
+    await batch.commit();
+    return reference.id;
+  }
+
+  Future<void> setDefaultCustomerAddress({
+    required String customerId,
+    required String addressId,
+  }) async {
+    final snapshot = await _firestore
+        .collection(diaChiCollection)
+        .where('khachHangId', isEqualTo: customerId)
+        .get();
+    if (!snapshot.docs.any((document) => document.id == addressId)) {
+      throw StateError('Địa chỉ không còn tồn tại.');
+    }
+    final batch = _firestore.batch();
+    for (final document in snapshot.docs) {
+      batch.update(document.reference, {'macDinh': document.id == addressId});
+    }
+    await batch.commit();
+  }
+
+  Future<void> deleteCustomerAddress({
+    required String customerId,
+    required String addressId,
+  }) async {
+    final snapshot = await _firestore
+        .collection(diaChiCollection)
+        .where('khachHangId', isEqualTo: customerId)
+        .get();
+    QueryDocumentSnapshot<Map<String, dynamic>>? removed;
+    for (final document in snapshot.docs) {
+      if (document.id == addressId) {
+        removed = document;
+        break;
+      }
+    }
+    if (removed == null) throw StateError('Địa chỉ không còn tồn tại.');
+
+    final batch = _firestore.batch()..delete(removed.reference);
+    if (removed.data()['macDinh'] == true) {
+      for (final document in snapshot.docs) {
+        if (document.id != addressId) {
+          batch.update(document.reference, {'macDinh': true});
+          break;
+        }
+      }
+    }
+    await batch.commit();
   }
 
   Stream<List<CustomerAddress>> watchAllAddresses() {

@@ -79,10 +79,18 @@ service cloud.firestore {
 
     function isOfferedStaff(orderData) {
       return isStaff()
-        && 'phanCongHienTaiId' in orderData
-        && exists(assignmentPath(orderData.phanCongHienTaiId))
-        && get(assignmentPath(orderData.phanCongHienTaiId)).data.nhanVienId
-          == request.auth.uid;
+        && (
+          (
+            'nhanVienDeXuatId' in orderData
+            && orderData.nhanVienDeXuatId == request.auth.uid
+          )
+          || (
+            'phanCongHienTaiId' in orderData
+            && exists(assignmentPath(orderData.phanCongHienTaiId))
+            && get(assignmentPath(orderData.phanCongHienTaiId)).data.nhanVienId
+              == request.auth.uid
+          )
+        );
     }
 
     function isAssignedStaff(orderData) {
@@ -101,8 +109,7 @@ service cloud.firestore {
       return isAdmin()
         || (isCustomer() && orderData.khachHangId == request.auth.uid)
         || isAssignedStaff(orderData)
-        || isOfferedStaff(orderData)
-        || (isStaff() && orderData.trangThai == 'CHO_XU_LY');
+        || isOfferedStaff(orderData);
     }
 
     function canActOnOrder(orderData) {
@@ -147,6 +154,8 @@ service cloud.firestore {
           'trangThai',
           'ghiChu',
           'nhanVienTuChoiIds',
+          'nhanVienDeXuatId',
+          'offerExpiresAt',
           'soLanDeXuat',
           'dangChoHoTro',
           'ngayTao',
@@ -160,8 +169,79 @@ service cloud.firestore {
         && request.resource.data.trangThai == 'CHO_XU_LY'
         && request.resource.data.nhanVienTuChoiIds is list
         && request.resource.data.nhanVienTuChoiIds.size() == 0
-        && request.resource.data.soLanDeXuat == 0
-        && request.resource.data.dangChoHoTro == false;
+        && (
+          (
+            !request.resource.data.keys().hasAny([
+              'nhanVienDeXuatId',
+              'offerExpiresAt'
+            ])
+            && request.resource.data.soLanDeXuat == 0
+            && request.resource.data.dangChoHoTro == true
+          )
+          || (
+            request.resource.data.nhanVienDeXuatId is string
+            && request.resource.data.offerExpiresAt is timestamp
+            && request.resource.data.soLanDeXuat == 1
+            && request.resource.data.dangChoHoTro == false
+            && exists(staffPath(request.resource.data.nhanVienDeXuatId))
+            && get(staffPath(request.resource.data.nhanVienDeXuatId))
+              .data.trangThaiLamViec in ['SAN_SANG', 'DANG_RANH']
+          )
+        );
+    }
+
+    function validCustomerAddress(addressId) {
+      return request.resource.data.keys().hasAll([
+          'diaChiId',
+          'khachHangId',
+          'diaChiChiTiet',
+          'toaDoLat',
+          'toaDoLng',
+          'macDinh'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'diaChiId',
+          'khachHangId',
+          'diaChiChiTiet',
+          'phuongXa',
+          'quanHuyen',
+          'tinhThanh',
+          'toaDoLat',
+          'toaDoLng',
+          'macDinh',
+          'trangThai'
+        ])
+        && request.resource.data.diaChiId == addressId
+        && request.resource.data.khachHangId == request.auth.uid
+        && request.resource.data.diaChiChiTiet is string
+        && request.resource.data.diaChiChiTiet.size() > 0
+        && request.resource.data.macDinh is bool
+        && (
+          !request.resource.data.keys().hasAny(['phuongXa'])
+          || request.resource.data.phuongXa is string
+        )
+        && (
+          !request.resource.data.keys().hasAny(['quanHuyen'])
+          || request.resource.data.quanHuyen is string
+        )
+        && (
+          !request.resource.data.keys().hasAny(['tinhThanh'])
+          || request.resource.data.tinhThanh is string
+        )
+        && request.resource.data.toaDoLat is number
+        && request.resource.data.toaDoLat >= -90
+        && request.resource.data.toaDoLat <= 90
+        && request.resource.data.toaDoLng is number
+        && request.resource.data.toaDoLng >= -180
+        && request.resource.data.toaDoLng <= 180
+        && (
+          request.resource.data.toaDoLat != 0
+          || request.resource.data.toaDoLng != 0
+        )
+        && (
+          !request.resource.data.keys().hasAny(['trangThai'])
+          || request.resource.data.trangThai == 'ACTIVE'
+        );
     }
 
     function customerCancelsOrder() {
@@ -205,6 +285,7 @@ service cloud.firestore {
 
     function staffClaimsOpenOrder() {
       return isAvailableStaff()
+        && isOfferedStaff(resource.data)
         && resource.data.trangThai == 'CHO_XU_LY'
         && !rejectedStaffIds(resource.data).hasAny([request.auth.uid])
         && (
@@ -227,9 +308,10 @@ service cloud.firestore {
         && onlyChanges([
           'nhanVienHienTaiId',
           'phanCongHienTaiId',
+          'nhanVienDeXuatId',
+          'offerExpiresAt',
           'gioChot',
           'trangThai',
-          'soLanDeXuat',
           'dangChoHoTro',
           'ngayCapNhat'
         ]);
@@ -238,18 +320,41 @@ service cloud.firestore {
     function staffDismissesOpenOrder() {
       let oldRejected = rejectedStaffIds(resource.data);
       let newRejected = rejectedStaffIds(request.resource.data);
-      return isStaff()
+      return isOfferedStaff(resource.data)
         && resource.data.trangThai == 'CHO_XU_LY'
         && request.resource.data.trangThai == 'CHO_XU_LY'
         && !oldRejected.hasAny([request.auth.uid])
         && newRejected.hasAll(oldRejected)
         && newRejected.hasAny([request.auth.uid])
         && newRejected.size() == oldRejected.size() + 1
-        && request.resource.data.soLanDeXuat
-          == resource.data.soLanDeXuat + 1
+        && (
+          (
+            !request.resource.data.keys().hasAny([
+              'nhanVienDeXuatId',
+              'offerExpiresAt'
+            ])
+            && request.resource.data.dangChoHoTro == true
+            && request.resource.data.soLanDeXuat
+              == resource.data.soLanDeXuat
+          )
+          || (
+            request.resource.data.nhanVienDeXuatId is string
+            && request.resource.data.nhanVienDeXuatId != request.auth.uid
+            && request.resource.data.offerExpiresAt is timestamp
+            && request.resource.data.dangChoHoTro == false
+            && request.resource.data.soLanDeXuat
+              == resource.data.soLanDeXuat + 1
+            && exists(staffPath(request.resource.data.nhanVienDeXuatId))
+            && get(staffPath(request.resource.data.nhanVienDeXuatId))
+              .data.trangThaiLamViec in ['SAN_SANG', 'DANG_RANH']
+          )
+        )
         && onlyChanges([
           'nhanVienTuChoiIds',
+          'nhanVienDeXuatId',
+          'offerExpiresAt',
           'soLanDeXuat',
+          'dangChoHoTro',
           'ngayCapNhat'
         ]);
     }
@@ -560,13 +665,19 @@ service cloud.firestore {
           && resource.data.khachHangId == request.auth.uid
         );
       allow create: if isCustomer()
-        && request.resource.data.diaChiId == addressId
-        && request.resource.data.khachHangId == request.auth.uid;
-      allow update, delete: if isAdmin()
+        && validCustomerAddress(addressId);
+      allow update: if isAdmin()
         || (
           isCustomer()
           && resource.data.khachHangId == request.auth.uid
           && request.resource.data.khachHangId == request.auth.uid
+          && request.resource.data.diaChiId == resource.data.diaChiId
+          && validCustomerAddress(addressId)
+        );
+      allow delete: if isAdmin()
+        || (
+          isCustomer()
+          && resource.data.khachHangId == request.auth.uid
         );
     }
 

@@ -46,7 +46,7 @@ class _OfferCountdownState extends State<OfferCountdown> {
   @override
   Widget build(BuildContext context) {
     final urgent = _remaining.inSeconds <= 30;
-    final color = urgent ? AppColors.accent : AppColors.secondary;
+    final color = urgent ? AppColors.accentForeground : AppColors.secondary;
     final background = urgent
         ? AppColors.accentLight
         : AppColors.secondaryLight;

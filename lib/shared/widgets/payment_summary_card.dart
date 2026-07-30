@@ -27,21 +27,12 @@ class PaymentSummaryCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: paid
-                        ? AppColors.primaryLight
-                        : AppColors.accentLight,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Icon(
-                    paid
-                        ? Icons.task_alt
-                        : Icons.account_balance_wallet_outlined,
-                    color: paid ? AppColors.primary : AppColors.accent,
-                  ),
+                Icon(
+                  paid
+                      ? Icons.task_alt_rounded
+                      : Icons.account_balance_wallet_rounded,
+                  color: paid ? AppColors.success : AppColors.warning,
+                  size: 24,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -57,7 +48,9 @@ class PaymentSummaryCard extends StatelessWidget {
                       Text(
                         paymentStatusLabel(payment.trangThai),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: paid ? AppColors.primary : AppColors.accent,
+                          color: paid
+                              ? AppColors.primary
+                              : AppColors.accentForeground,
                           fontWeight: FontWeight.w700,
                         ),
                       ),

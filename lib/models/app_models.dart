@@ -128,6 +128,13 @@ class CustomerAddress {
   final bool macDinh;
 
   String get shortAddress => '$diaChiChiTiet, $phuongXa';
+
+  bool get hasPickupCoordinate =>
+      toaDoLat >= -90 &&
+      toaDoLat <= 90 &&
+      toaDoLng >= -180 &&
+      toaDoLng <= 180 &&
+      (toaDoLat != 0 || toaDoLng != 0);
 }
 
 class WasteType {

@@ -19,66 +19,94 @@ class AddressOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
+    return AnimatedContainer(
+      duration: AppMotion.fast,
+      curve: AppMotion.emphasized,
+      decoration: BoxDecoration(
+        color: selected ? AppColors.green50 : AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(
+        border: Border.all(
           color: selected ? AppColors.primary : AppColors.border,
-          width: selected ? 1.3 : 1,
+          width: selected ? 1.5 : 1,
         ),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            children: [
-              OptionIcon(
-                icon: address.macDinh
-                    ? Icons.home_work_outlined
-                    : Icons.place_outlined,
-                selected: selected,
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            address.shortAddress,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                        if (address.macDinh)
-                          const StatusChip(status: 'MAC_DINH', compact: true),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '${address.quanHuyen}, ${address.tinhThanh}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                    ),
-                  ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                OptionIcon(
+                  icon: address.macDinh
+                      ? Icons.home_work_outlined
+                      : Icons.place_outlined,
+                  selected: selected,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: selected ? AppColors.primary : AppColors.textMuted,
-              ),
-            ],
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              address.shortAddress,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          if (address.macDinh)
+                            const StatusChip(status: 'MAC_DINH', compact: true),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        [
+                          address.quanHuyen,
+                          address.tinhThanh,
+                        ].where((value) => value.trim().isNotEmpty).join(', '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                      ),
+                      if (!address.hasPickupCoordinate) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 16,
+                              color: AppColors.warning,
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Expanded(
+                              child: Text(
+                                'Chưa chọn điểm trên bản đồ',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(color: AppColors.warning),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Icon(
+                  selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                  color: selected ? AppColors.primary : AppColors.textMuted,
+                ),
+              ],
+            ),
           ),
         ),
       ),

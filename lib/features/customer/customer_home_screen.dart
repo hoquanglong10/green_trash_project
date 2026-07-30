@@ -4,12 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/status_mapper.dart';
-import '../notifications/presentation/customer_notifications_screen.dart';
-import '../notifications/presentation/widgets/notification_bell.dart';
 import '../../models/app_models.dart';
 import '../../providers/app_providers.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/dashboard_shell.dart';
+import '../../shared/widgets/home_dashboard_widgets.dart';
+import '../notifications/presentation/customer_notifications_screen.dart';
+import '../notifications/presentation/widgets/notification_bell.dart';
 import '../orders/presentation/order_history_screen.dart';
+import 'address_book/presentation/address_book_screen.dart';
 import 'booking_screen.dart';
 import 'order_detail_screen.dart';
 
@@ -20,478 +23,459 @@ class CustomerHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     if (user == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: AppLoadingView(message: 'Đang chuẩn bị trang chủ...'),
+      );
     }
+
     final orders = ref.watch(customerOrdersProvider);
+    final addresses = ref.watch(allAddressesProvider);
+    final wastes = ref.watch(wasteTypesProvider);
+    final staff = ref.watch(staffProfilesProvider);
+    final notifications = ref.watch(notificationsProvider);
     final subscription = ref.watch(currentSubscriptionProvider);
     final packages = ref.watch(packagesProvider);
     final package = packages.isEmpty ? null : packages.first;
-    final notifications = ref.watch(notificationsProvider);
-    final allAddresses = ref.watch(allAddressesProvider);
-    final wastes = ref.watch(wasteTypesProvider);
-    final staff = ref.watch(staffProfilesProvider);
-    final activeOrder = _activeOrder(orders);
+    final activeOrder = _findActiveOrder(orders);
+    final recentOrders = orders
+        .where((order) => order.maDon != activeOrder?.maDon)
+        .take(2)
+        .toList();
 
-    return AppPage(
-      maxWidth: 900,
-      titleWidget: const BrandWordmark(white: true, width: 210, height: 52),
-      appBarHeight: 96,
-      title: 'Trang chủ',
-      scaffoldBackgroundColor: HomeTrialColors.gray,
-      appBarBackgroundColor: HomeTrialColors.green,
-      appBarTitleColor: HomeTrialColors.white,
-      appBarSubtitleColor: AppColors.opacity(HomeTrialColors.white, 0.82),
-      leading: IconButton(
-        tooltip: 'Đăng xuất',
-        onPressed: () async {
+    void openBooking() {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const BookingScreen()));
+    }
+
+    void openHistory() {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              const OrderHistoryScreen(audience: OrderHistoryAudience.customer),
+        ),
+      );
+    }
+
+    void openNotifications() {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const CustomerNotificationsScreen()),
+      );
+    }
+
+    void openAddressBook() {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const AddressBookScreen()));
+    }
+
+    return DashboardShell(
+      maxContentWidth: 1120,
+      drawer: _CustomerDrawer(
+        user: user,
+        onAddressBook: openAddressBook,
+        onLogout: () async {
           await ref.read(firebaseAuthenticationServiceProvider).signOut();
           ref.read(currentSessionProvider.notifier).state = null;
         },
-        icon: const Icon(Icons.menu_rounded, size: 32),
       ),
+      destinations: [
+        DashboardDestination(
+          icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
+          label: 'Trang chủ',
+          onSelected: () {},
+        ),
+        DashboardDestination(
+          icon: Icons.receipt_long_outlined,
+          selectedIcon: Icons.receipt_long_rounded,
+          label: 'Đơn hàng',
+          onSelected: openHistory,
+        ),
+        DashboardDestination(
+          icon: Icons.notifications_none_rounded,
+          selectedIcon: Icons.notifications_rounded,
+          label: 'Thông báo',
+          onSelected: openNotifications,
+        ),
+        DashboardDestination(
+          icon: Icons.location_on_outlined,
+          selectedIcon: Icons.location_on_rounded,
+          label: 'Địa chỉ',
+          onSelected: openAddressBook,
+        ),
+      ],
       actions: [
         NotificationBell(
           notifications: notifications,
-          onViewAll: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const CustomerNotificationsScreen(),
-              ),
-            );
-          },
+          onViewAll: openNotifications,
         ),
+        const SizedBox(width: AppSpacing.sm),
       ],
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 720;
-          final padding = const EdgeInsets.fromLTRB(
-            AppSpacing.screenHorizontal,
-            AppSpacing.lg,
-            AppSpacing.screenHorizontal,
-            AppSpacing.xxl,
-          );
-
-          final actionColumn = _CustomerActionColumn(
-            user: user,
-            activeOrder: activeOrder,
-            package: package,
-            subscription: subscription,
-            addresses: allAddresses,
-            wastes: wastes,
-            staff: staff,
-            onBooking: () => _openBooking(context),
-          );
-          final activityColumn = _CustomerActivityColumn(
-            orders: orders,
-            addresses: allAddresses,
-            wastes: wastes,
-            staff: staff,
-            onViewHistory: () => _openHistory(context),
-          );
-
-          if (wide) {
-            return ListView(
-              padding: padding,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          final wide = constraints.maxWidth >= 820;
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  wide ? AppSpacing.xxl : AppSpacing.screenHorizontal,
+                  AppSpacing.xl,
+                  wide ? AppSpacing.xxl : AppSpacing.screenHorizontal,
+                  AppSpacing.xxxl,
+                ),
+                sliver: SliverList.list(
                   children: [
-                    Expanded(flex: 5, child: actionColumn),
-                    const SizedBox(width: AppSpacing.xl),
-                    Expanded(flex: 4, child: activityColumn),
+                    _PageGreeting(user: user),
+                    const SizedBox(height: AppSpacing.lg),
+                    _WelcomeHero(
+                      user: user,
+                      activeOrder: activeOrder,
+                      onAction: activeOrder == null
+                          ? openBooking
+                          : () => _openOrder(context, activeOrder),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    if (wide)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 7,
+                            child: _CurrentOrderModule(
+                              order: activeOrder,
+                              address: _findAddress(
+                                addresses,
+                                activeOrder?.diaChiId,
+                              ),
+                              waste: _findWaste(wastes, activeOrder?.loaiRacId),
+                              staff: _findStaff(
+                                staff,
+                                activeOrder?.nhanVienHienTaiId ??
+                                    activeOrder?.nhanVienDeXuatId,
+                              ),
+                              onBooking: openBooking,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.lg),
+                          SizedBox(
+                            width: 330,
+                            child: _QuickActions(
+                              hasActiveOrder: activeOrder != null,
+                              onBooking: activeOrder == null
+                                  ? openBooking
+                                  : () => _openOrder(context, activeOrder),
+                              onHistory: openHistory,
+                              onNotifications: openNotifications,
+                              onSupport: () => _showSupport(context),
+                            ),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      _CurrentOrderModule(
+                        order: activeOrder,
+                        address: _findAddress(addresses, activeOrder?.diaChiId),
+                        waste: _findWaste(wastes, activeOrder?.loaiRacId),
+                        staff: _findStaff(
+                          staff,
+                          activeOrder?.nhanVienHienTaiId ??
+                              activeOrder?.nhanVienDeXuatId,
+                        ),
+                        onBooking: openBooking,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      _QuickActions(
+                        hasActiveOrder: activeOrder != null,
+                        onBooking: activeOrder == null
+                            ? openBooking
+                            : () => _openOrder(context, activeOrder),
+                        onHistory: openHistory,
+                        onNotifications: openNotifications,
+                        onSupport: () => _showSupport(context),
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.xxl),
+                    if (wide)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _PackageModule(
+                              package: package,
+                              subscription: subscription,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.lg),
+                          Expanded(
+                            child: _RecentOrdersModule(
+                              orders: recentOrders,
+                              addresses: addresses,
+                              wastes: wastes,
+                              staff: staff,
+                              onViewAll: openHistory,
+                            ),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      _PackageModule(
+                        package: package,
+                        subscription: subscription,
+                      ),
+                      const SizedBox(height: AppSpacing.xxl),
+                      _RecentOrdersModule(
+                        orders: recentOrders,
+                        addresses: addresses,
+                        wastes: wastes,
+                        staff: staff,
+                        onViewAll: openHistory,
+                      ),
+                    ],
                   ],
                 ),
-              ],
-            );
-          }
-
-          return ListView(
-            padding: padding,
-            children: [
-              actionColumn,
-              const SizedBox(height: AppSpacing.sectionGap),
-              activityColumn,
+              ),
             ],
           );
         },
       ),
     );
   }
-
-  static PickupOrder? _activeOrder(List<PickupOrder> orders) {
-    for (final order in orders) {
-      if (order.trangThai != 'HOAN_THANH' && order.trangThai != 'HUY') {
-        return order;
-      }
-    }
-    return null;
-  }
-
-  static void _openBooking(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const BookingScreen()));
-  }
-
-  static void _openHistory(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            const OrderHistoryScreen(audience: OrderHistoryAudience.customer),
-      ),
-    );
-  }
 }
 
-class _CustomerActionColumn extends StatelessWidget {
-  const _CustomerActionColumn({
-    required this.user,
-    required this.activeOrder,
-    required this.package,
-    required this.subscription,
-    required this.addresses,
-    required this.wastes,
-    required this.staff,
-    required this.onBooking,
-  });
+class _PageGreeting extends StatelessWidget {
+  const _PageGreeting({required this.user});
 
   final AppUser user;
-  final PickupOrder? activeOrder;
-  final PickupPackage? package;
-  final PackageSubscription? subscription;
-  final List<CustomerAddress> addresses;
-  final List<WasteType> wastes;
-  final List<StaffProfile> staff;
-  final VoidCallback onBooking;
 
   @override
   Widget build(BuildContext context) {
-    final selectedOrder = activeOrder;
-    final selectedPackage = package;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final now = DateTime.now();
+    const weekdays = [
+      'Thứ Hai',
+      'Thứ Ba',
+      'Thứ Tư',
+      'Thứ Năm',
+      'Thứ Sáu',
+      'Thứ Bảy',
+      'Chủ Nhật',
+    ];
+    return Row(
       children: [
-        _HomeHeroCard(
-          title: 'Xin chào, ${user.hoTen}',
-          subtitle: activeOrder == null
-              ? 'Đặt lịch thu gom và theo dõi nhân viên xử lý theo thời gian thực.'
-              : 'Đơn của bạn đang được xử lý. GreenTrash sẽ cập nhật từng bước.',
-          actionLabel: 'Đặt đơn mới',
-          onAction: onBooking,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _LiveOrderCard(
-          order: selectedOrder,
-          address: selectedOrder == null
-              ? null
-              : _findAddress(addresses, selectedOrder.diaChiId),
-          waste: selectedOrder == null
-              ? null
-              : _findWaste(wastes, selectedOrder.loaiRacId),
-          staffProfile: selectedOrder == null
-              ? null
-              : _findStaff(
-                  staff,
-                  selectedOrder.nhanVienHienTaiId ??
-                      selectedOrder.nhanVienDeXuatId,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${weekdays[now.weekday - 1]}, ${formatDate(now)}',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: AppColors.textMuted),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Chào ${_firstName(user.hoTen)}',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
-          onBooking: onBooking,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (selectedPackage != null)
-          _SubscriptionCard(
-            subscription: subscription,
-            package: selectedPackage,
-          )
-        else
-          const EmptyState(
-            icon: Icons.inventory_2_outlined,
-            title: 'Chưa có gói thu gom',
-            message: 'Gói tháng hiện tại sẽ hiển thị tại đây.',
+              ),
+            ],
           ),
-        const SizedBox(height: AppSpacing.md),
-        _HomeSearchBar(
-          hint: 'Tìm loại rác bạn muốn thu gom?',
-          onTap: onBooking,
         ),
-        const SizedBox(height: AppSpacing.md),
-        _HomePrimaryButton(
-          label: 'Lập Đơn Thu Gom Mới',
-          icon: Icons.add_task_outlined,
-          onPressed: onBooking,
+        CircleAvatar(
+          radius: 23,
+          backgroundColor: AppColors.green100,
+          foregroundColor: AppColors.primaryDark,
+          child: Text(
+            _initials(user.hoTen),
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
       ],
     );
   }
 }
 
-class _HomeHeroCard extends StatelessWidget {
-  const _HomeHeroCard({
-    required this.title,
-    required this.subtitle,
-    required this.actionLabel,
+class _WelcomeHero extends StatelessWidget {
+  const _WelcomeHero({
+    required this.user,
+    required this.activeOrder,
     required this.onAction,
   });
 
-  final String title;
-  final String subtitle;
-  final String actionLabel;
+  final AppUser user;
+  final PickupOrder? activeOrder;
   final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.xl),
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [HomeTrialColors.green, HomeTrialColors.blue],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    final hasActiveOrder = activeOrder != null;
+    return Container(
+      constraints: const BoxConstraints(minHeight: 188),
+      decoration: BoxDecoration(
+        gradient: AppGradients.hero,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -24,
+            bottom: -28,
+            child: Icon(
+              hasActiveOrder
+                  ? Icons.local_shipping_rounded
+                  : Icons.recycling_rounded,
+              size: 154,
+              color: AppColors.opacity(AppColors.white, 0.08),
+            ),
           ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              right: -18,
-              bottom: -18,
-              child: Icon(
-                Icons.recycling,
-                color: AppColors.opacity(HomeTrialColors.white, 0.13),
-                size: 148,
-              ),
-            ),
-            Positioned(
-              top: 22,
-              right: 98,
-              child: Icon(
-                Icons.eco_outlined,
-                color: AppColors.opacity(HomeTrialColors.amber, 0.78),
-                size: 20,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: HomeTrialColors.white,
-                                fontWeight: FontWeight.w900,
-                              ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: AppColors.opacity(
-                                  HomeTrialColors.white,
-                                  0.90,
-                                ),
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        SizedBox(
-                          height: 40,
-                          child: FilledButton.icon(
-                            onPressed: onAction,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: HomeTrialColors.white,
-                              foregroundColor: HomeTrialColors.green,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.lg,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.md,
-                                ),
-                              ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.xxl),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HeroEyebrow(
+                        label: hasActiveOrder
+                            ? orderStatusStyle(activeOrder!.trangThai).label
+                            : 'Sẵn sàng thu gom',
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        hasActiveOrder
+                            ? 'Đơn của bạn đang được xử lý'
+                            : 'Biến rác thành một hành động xanh',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: AppColors.textInverse,
+                              fontWeight: FontWeight.w800,
                             ),
-                            icon: const Icon(Icons.add_task_outlined, size: 18),
-                            label: Text(actionLabel),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        hasActiveOrder
+                            ? 'Theo dõi vị trí và từng mốc xử lý ngay trong ứng dụng.'
+                            : 'Đặt lịch trong vài bước, GreenTrash sẽ kết nối nhân viên phù hợp.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textInverseMuted,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      SizedBox(
+                        height: 42,
+                        child: FilledButton.icon(
+                          onPressed: onAction,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.white,
+                            foregroundColor: AppColors.green800,
+                          ),
+                          icon: Icon(
+                            hasActiveOrder
+                                ? Icons.route_rounded
+                                : Icons.add_rounded,
+                            size: 18,
+                          ),
+                          label: Text(
+                            hasActiveOrder ? 'Theo dõi đơn' : 'Đặt lịch ngay',
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: AppColors.opacity(HomeTrialColors.white, 0.16),
-                      borderRadius: BorderRadius.circular(AppRadius.xxl),
-                      border: Border.all(
-                        color: AppColors.opacity(HomeTrialColors.white, 0.25),
                       ),
-                    ),
-                    child: const Icon(
-                      Icons.delete_outline,
-                      color: HomeTrialColors.white,
-                      size: 38,
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 92),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _HomeSearchBar extends StatelessWidget {
-  const _HomeSearchBar({required this.hint, required this.onTap});
-
-  final String hint;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      onTap: onTap,
-      child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        decoration: BoxDecoration(
-          color: HomeTrialColors.white,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: HomeTrialColors.border),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.search, size: 21, color: HomeTrialColors.muted),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                hint,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: HomeTrialColors.muted),
-              ),
-            ),
-            Container(width: 1, height: 24, color: HomeTrialColors.border),
-            const SizedBox(width: AppSpacing.sm),
-            const Icon(
-              Icons.qr_code_scanner_outlined,
-              size: 21,
-              color: HomeTrialColors.purple,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HomePrimaryButton extends StatelessWidget {
-  const _HomePrimaryButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
+class _HeroEyebrow extends StatelessWidget {
+  const _HeroEyebrow({required this.label});
 
   final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: AppSizes.buttonHeight,
-      child: FilledButton.icon(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: HomeTrialColors.green,
-          foregroundColor: HomeTrialColors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(
+            color: AppColors.accent,
+            shape: BoxShape.circle,
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
         ),
-        icon: Icon(icon, size: 18),
-        label: Text(label),
-      ),
+        const SizedBox(width: AppSpacing.sm),
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.labelMedium?.copyWith(color: AppColors.textInverseMuted),
+        ),
+      ],
     );
   }
 }
 
-class _LiveOrderCard extends StatelessWidget {
-  const _LiveOrderCard({
+class _CurrentOrderModule extends StatelessWidget {
+  const _CurrentOrderModule({
     required this.order,
     required this.address,
     required this.waste,
-    required this.staffProfile,
+    required this.staff,
     required this.onBooking,
   });
 
   final PickupOrder? order;
   final CustomerAddress? address;
   final WasteType? waste;
-  final StaffProfile? staffProfile;
+  final StaffProfile? staff;
   final VoidCallback onBooking;
 
   @override
   Widget build(BuildContext context) {
     final currentOrder = order;
     if (currentOrder == null) {
-      return Card(
-        color: HomeTrialColors.white,
-        shape: _homeCardShape(),
+      return _ModuleSurface(
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
+          padding: const EdgeInsets.all(AppSpacing.xxl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: HomeTrialColors.greenSoft,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: const Icon(
-                  Icons.add_location_alt_outlined,
-                  color: HomeTrialColors.green,
-                ),
+              const Icon(
+                Icons.event_available_rounded,
+                color: AppColors.primary,
+                size: 28,
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sẵn sàng đặt lịch',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      'Tạo đơn mới để nhân viên đang sẵn sàng có thể nhận.',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                'Bạn chưa có lịch thu gom',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              IconButton(
-                tooltip: 'Đặt đơn',
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Tạo lịch mới để nhân viên gần khu vực có thể nhận đơn.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              OutlinedButton.icon(
                 onPressed: onBooking,
-                icon: const Icon(Icons.chevron_right),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Tạo lịch thu gom'),
               ),
             ],
           ),
@@ -499,76 +483,89 @@ class _LiveOrderCard extends StatelessWidget {
       );
     }
 
-    final assignedStaff = staffProfile;
-    final message = switch (currentOrder.trangThai) {
-      'CHO_XU_LY' =>
-        assignedStaff == null
-            ? 'Đơn đang chờ nhân viên sẵn sàng nhận.'
-            : 'Đang chờ ${assignedStaff.maNhanVien} xác nhận.',
-      'DA_NHAN' =>
-        assignedStaff == null
-            ? 'Nhân viên đã nhận đơn.'
-            : '${assignedStaff.maNhanVien} đã nhận đơn.',
-      'DANG_DEN' => 'Nhân viên đang di chuyển đến điểm lấy.',
-      'DA_DEN' => 'Nhân viên đã đến điểm lấy.',
-      'DANG_CAN_RAC' => 'Nhân viên đang kiểm tra và cân rác.',
-      _ => 'Đơn đang được cập nhật.',
-    };
-
-    return Card(
-      color: HomeTrialColors.white,
-      shape: _homeCardShape(),
+    final style = orderStatusStyle(currentOrder.trangThai);
+    return _ModuleSurface(
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => OrderDetailScreen(maDon: currentOrder.maDon),
-            ),
-          );
-        },
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        onTap: () => _openOrder(context, currentOrder),
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'Đơn đang theo dõi',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: HomeTrialColors.slate,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Đơn đang hoạt động',
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: AppColors.textMuted),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          formatOrderCode(currentOrder.maDon),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ],
                     ),
                   ),
-                  _HomeStatusChip(status: currentOrder.trangThai),
+                  StatusChip(status: currentOrder.trangThai, compact: true),
                 ],
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                '${currentOrder.maDon} • ${formatDayMonth(currentOrder.ngayThuGom)} • ${currentOrder.khungGio}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: HomeTrialColors.muted,
-                  fontWeight: FontWeight.w600,
-                ),
+              const SizedBox(height: AppSpacing.xl),
+              _LiveStatusLine(
+                icon: style.icon,
+                color: style.foreground,
+                text: _activeOrderMessage(currentOrder, staff),
               ),
+              const SizedBox(height: AppSpacing.lg),
+              OrderJourneyBar(status: currentOrder.trangThai),
+              const SizedBox(height: AppSpacing.xl),
+              const Divider(),
               const SizedBox(height: AppSpacing.md),
-              _InfoLine(
-                icon: Icons.notifications_active_outlined,
-                text: message,
+              Wrap(
+                spacing: AppSpacing.xl,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  _CompactFact(
+                    icon: Icons.schedule_rounded,
+                    value:
+                        '${formatDayMonth(currentOrder.ngayThuGom)} • ${currentOrder.khungGio}',
+                  ),
+                  _CompactFact(
+                    icon: Icons.recycling_rounded,
+                    value:
+                        '${waste?.tenLoaiRac ?? currentOrder.loaiRacId} • ${formatKg(currentOrder.khoiLuongDuKien)}',
+                  ),
+                  _CompactFact(
+                    icon: Icons.location_on_rounded,
+                    value: address?.shortAddress ?? currentOrder.diaChiId,
+                  ),
+                ],
               ),
-              const SizedBox(height: AppSpacing.sm),
-              _InfoLine(
-                icon: Icons.delete_outline,
-                text:
-                    '${waste?.tenLoaiRac ?? currentOrder.loaiRacId} • ${formatKg(currentOrder.khoiLuongDuKien)}',
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              _InfoLine(
-                icon: Icons.place_outlined,
-                text: address?.shortAddress ?? currentOrder.diaChiId,
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    'Xem chi tiết',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelLarge?.copyWith(color: AppColors.primary),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                ],
               ),
             ],
           ),
@@ -578,140 +575,137 @@ class _LiveOrderCard extends StatelessWidget {
   }
 }
 
-class _SubscriptionCard extends StatelessWidget {
-  const _SubscriptionCard({required this.subscription, required this.package});
+class _QuickActions extends StatelessWidget {
+  const _QuickActions({
+    required this.hasActiveOrder,
+    required this.onBooking,
+    required this.onHistory,
+    required this.onNotifications,
+    required this.onSupport,
+  });
 
-  final PackageSubscription? subscription;
-  final PickupPackage package;
+  final bool hasActiveOrder;
+  final VoidCallback onBooking;
+  final VoidCallback onHistory;
+  final VoidCallback onNotifications;
+  final VoidCallback onSupport;
 
   @override
   Widget build(BuildContext context) {
-    final used = subscription?.soKgDaDung ?? 0;
-    final remaining = subscription?.soKgConLai ?? package.hanMucKgThang;
-    final total = used + remaining;
-    final progress = total == 0
-        ? 0.0
-        : (used / total).clamp(0.0, 1.0).toDouble();
-
-    return Card(
-      color: HomeTrialColors.white,
-      shape: _homeCardShape(),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: HomeTrialColors.greenSoft,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: const Icon(
-                    Icons.inventory_2_outlined,
-                    color: HomeTrialColors.green,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        package.tenGoi,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: HomeTrialColors.slate,
-                              fontWeight: FontWeight.w800,
-                            ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      _PaymentStatusBadge(
-                        label: paymentStatusLabel(
-                          subscription?.trangThai ?? 'CON_HL',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: HomeTrialColors.amberSoft,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: const Icon(
-                    Icons.workspace_premium_outlined,
-                    color: HomeTrialColors.amber,
-                    size: 21,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            LinearProgressIndicator(
-              value: progress,
-              minHeight: 7,
-              backgroundColor: HomeTrialColors.greenSoft,
-              color: HomeTrialColors.green,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                Expanded(child: _PackageStat(value: formatKg(used))),
-                Expanded(
-                  child: _PackageStat(
-                    value: formatKg(remaining),
-                    align: TextAlign.center,
-                  ),
-                ),
-                Expanded(
-                  child: _PackageStat(
-                    value: formatMoney(package.phiVuotGoi),
-                    align: TextAlign.right,
-                    color: HomeTrialColors.green,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+    final actions = [
+      (
+        hasActiveOrder ? Icons.route_rounded : Icons.add_task_rounded,
+        hasActiveOrder ? 'Theo dõi' : 'Đặt lịch',
+        hasActiveOrder ? 'Đơn hiện tại' : 'Thu gom mới',
+        AppColors.primary,
+        onBooking,
       ),
+      (
+        Icons.history_rounded,
+        'Lịch sử',
+        'Các đơn đã đặt',
+        AppColors.processing,
+        onHistory,
+      ),
+      (
+        Icons.notifications_rounded,
+        'Thông báo',
+        'Cập nhật mới',
+        AppColors.warning,
+        onNotifications,
+      ),
+      (
+        Icons.support_agent_rounded,
+        'Hỗ trợ',
+        'Liên hệ nhanh',
+        AppColors.success,
+        onSupport,
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(
+          title: 'Thao tác nhanh',
+          subtitle: 'Các chức năng bạn thường dùng',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: actions.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisSpacing: AppSpacing.sm,
+            childAspectRatio: 1.42,
+          ),
+          itemBuilder: (context, index) {
+            final action = actions[index];
+            return _QuickActionTile(
+              icon: action.$1,
+              title: action.$2,
+              subtitle: action.$3,
+              color: action.$4,
+              onTap: action.$5,
+            );
+          },
+        ),
+      ],
     );
   }
 }
 
-class _PaymentStatusBadge extends StatelessWidget {
-  const _PaymentStatusBadge({required this.label});
+class _QuickActionTile extends StatelessWidget {
+  const _QuickActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
 
-  final String label;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: HomeTrialColors.greenSoft,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        side: const BorderSide(color: AppColors.border),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xs,
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: HomeTrialColors.green,
-            fontWeight: FontWeight.w800,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const Spacer(),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ],
           ),
         ),
       ),
@@ -719,333 +713,240 @@ class _PaymentStatusBadge extends StatelessWidget {
   }
 }
 
-class _CustomerActivityColumn extends StatelessWidget {
-  const _CustomerActivityColumn({
+class _PackageModule extends StatelessWidget {
+  const _PackageModule({required this.package, required this.subscription});
+
+  final PickupPackage? package;
+  final PackageSubscription? subscription;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentPackage = package;
+    if (currentPackage == null) {
+      return const EmptyState(
+        icon: Icons.inventory_2_outlined,
+        title: 'Chưa có gói thu gom',
+        message: 'Gói tháng hiện tại sẽ hiển thị tại đây.',
+      );
+    }
+
+    final used = subscription?.soKgDaDung ?? 0;
+    final remaining = subscription?.soKgConLai ?? currentPackage.hanMucKgThang;
+    final total = used + remaining;
+    final progress = total == 0 ? 0.0 : (used / total).clamp(0.0, 1.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(
+          title: 'Gói thu gom',
+          subtitle: 'Hạn mức sử dụng trong tháng',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _ModuleSurface(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.inventory_2_rounded,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currentPackage.tenGoi,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: AppSpacing.xxs),
+                          Text(
+                            subscription?.trangThai == 'CON_HL'
+                                ? 'Đang có hiệu lực'
+                                : 'Cần gia hạn',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: subscription?.trangThai == 'CON_HL'
+                                      ? AppColors.success
+                                      : AppColors.warning,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '${(progress * 100).round()}%',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AnimatedProgressBar(value: progress),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _PackageValue(
+                        label: 'Đã dùng',
+                        value: formatKg(used),
+                      ),
+                    ),
+                    Expanded(
+                      child: _PackageValue(
+                        label: 'Còn lại',
+                        value: formatKg(remaining),
+                        align: TextAlign.center,
+                      ),
+                    ),
+                    Expanded(
+                      child: _PackageValue(
+                        label: 'Phí vượt',
+                        value: formatMoney(currentPackage.phiVuotGoi),
+                        align: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PackageValue extends StatelessWidget {
+  const _PackageValue({
+    required this.label,
+    required this.value,
+    this.align = TextAlign.left,
+  });
+
+  final String label;
+  final String value;
+  final TextAlign align;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: switch (align) {
+        TextAlign.right => CrossAxisAlignment.end,
+        TextAlign.center => CrossAxisAlignment.center,
+        _ => CrossAxisAlignment.start,
+      },
+      children: [
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
+      ],
+    );
+  }
+}
+
+class _RecentOrdersModule extends StatelessWidget {
+  const _RecentOrdersModule({
     required this.orders,
     required this.addresses,
     required this.wastes,
     required this.staff,
-    required this.onViewHistory,
+    required this.onViewAll,
   });
 
   final List<PickupOrder> orders;
   final List<CustomerAddress> addresses;
   final List<WasteType> wastes;
   final List<StaffProfile> staff;
-  final VoidCallback onViewHistory;
+  final VoidCallback onViewAll;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _HomeSectionHeader(
+        SectionHeader(
           title: 'Đơn gần đây',
-          subtitle: 'Theo dõi các đơn đã đặt',
-          trailing: TextButton.icon(
-            onPressed: onViewHistory,
-            icon: const Icon(Icons.history_outlined, size: 17),
-            label: const Text('Xem lịch sử'),
+          subtitle: 'Hai đơn được cập nhật gần nhất',
+          trailing: TextButton(
+            onPressed: onViewAll,
+            child: const Text('Xem tất cả'),
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.md),
         if (orders.isEmpty)
           const EmptyState(
-            icon: Icons.inventory_2_outlined,
-            title: 'Chưa có đơn thu gom',
-            message: 'Các đơn đã đặt sẽ xuất hiện tại đây.',
+            icon: Icons.receipt_long_outlined,
+            title: 'Chưa có lịch sử',
+            message: 'Đơn hoàn thành hoặc đã hủy sẽ xuất hiện tại đây.',
           )
         else
-          ...orders
-              .take(2)
-              .map(
-                (order) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: _RecentOrderCard(
-                    order: order,
-                    address: _findAddress(addresses, order.diaChiId),
-                    waste: _findWaste(wastes, order.loaiRacId),
-                    staffProfile: _findStaff(
-                      staff,
-                      order.nhanVienHienTaiId ?? order.nhanVienDeXuatId,
-                    ),
-                  ),
-                ),
+          ...orders.map(
+            (order) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: OrderCard(
+                order: order,
+                address: _findAddress(addresses, order.diaChiId),
+                wasteType: _findWaste(wastes, order.loaiRacId),
+                staffName: _findStaff(
+                  staff,
+                  order.nhanVienHienTaiId ?? order.nhanVienDeXuatId,
+                )?.maNhanVien,
+                onTap: () => _openOrder(context, order),
               ),
+            ),
+          ),
       ],
     );
   }
 }
 
-class _HomeSectionHeader extends StatelessWidget {
-  const _HomeSectionHeader({required this.title, this.subtitle, this.trailing});
+class _ModuleSurface extends StatelessWidget {
+  const _ModuleSurface({required this.child});
 
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: HomeTrialColors.slate,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  subtitle!,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: HomeTrialColors.muted),
-                ),
-              ],
-            ],
-          ),
-        ),
-        ?trailing,
-      ],
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
     );
   }
 }
 
-class _HomeStatusChip extends StatelessWidget {
-  const _HomeStatusChip({required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = orderStatusStyle(status).label;
-    final color = _homeStatusColor(status);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: _homeStatusBackground(status),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xs,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(_homeStatusIcon(status), size: 13, color: color),
-            const SizedBox(width: AppSpacing.xs),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-Color _homeStatusColor(String status) {
-  return switch (status) {
-    'CHO_XU_LY' || 'CHO_NHAN' => HomeTrialColors.amber,
-    'DA_NHAN' || 'HOAN_THANH' => HomeTrialColors.green,
-    'DANG_DEN' || 'DA_DEN' || 'DANG_CAN_RAC' => HomeTrialColors.blue,
-    'HUY' => HomeTrialColors.slate,
-    _ => HomeTrialColors.purple,
-  };
-}
-
-Color _homeStatusBackground(String status) {
-  return switch (status) {
-    'CHO_XU_LY' || 'CHO_NHAN' => HomeTrialColors.amberSoft,
-    'DA_NHAN' || 'HOAN_THANH' => HomeTrialColors.greenSoft,
-    'DANG_DEN' || 'DA_DEN' || 'DANG_CAN_RAC' => HomeTrialColors.blueSoft,
-    'HUY' => HomeTrialColors.slateSoft,
-    _ => HomeTrialColors.purpleSoft,
-  };
-}
-
-IconData _homeStatusIcon(String status) {
-  return switch (status) {
-    'CHO_XU_LY' || 'CHO_NHAN' => Icons.schedule,
-    'DA_NHAN' || 'HOAN_THANH' => Icons.check_circle_outline,
-    'DANG_DEN' || 'DA_DEN' || 'DANG_CAN_RAC' => Icons.sync_outlined,
-    'HUY' => Icons.cancel_outlined,
-    _ => Icons.info_outline,
-  };
-}
-
-RoundedRectangleBorder _homeCardShape() {
-  return RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(AppRadius.xl),
-    side: const BorderSide(color: HomeTrialColors.border),
-  );
-}
-
-class _RecentOrderCard extends StatelessWidget {
-  const _RecentOrderCard({
-    required this.order,
-    required this.address,
-    required this.waste,
-    required this.staffProfile,
+class _LiveStatusLine extends StatelessWidget {
+  const _LiveStatusLine({
+    required this.icon,
+    required this.color,
+    required this.text,
   });
-
-  final PickupOrder order;
-  final CustomerAddress? address;
-  final WasteType? waste;
-  final StaffProfile? staffProfile;
-
-  @override
-  Widget build(BuildContext context) {
-    final assignedStaff = staffProfile;
-    final assigneeLabel = assignedStaff == null
-        ? 'Đang chờ nhận'
-        : order.nhanVienHienTaiId == null
-        ? 'Đã báo ${assignedStaff.maNhanVien}'
-        : '${assignedStaff.maNhanVien} đã nhận';
-    final statusColor = _homeStatusColor(order.trangThai);
-
-    return Card(
-      color: HomeTrialColors.white,
-      shape: _homeCardShape(),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => OrderDetailScreen(maDon: order.maDon),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: _homeStatusBackground(order.trangThai),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(
-                      _homeStatusIcon(order.trangThai),
-                      color: statusColor,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          order.maDon,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: HomeTrialColors.slate,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                        const SizedBox(height: AppSpacing.xxs),
-                        Text(
-                          '${formatDayMonth(order.ngayThuGom)} • ${order.khungGio}',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: HomeTrialColors.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _HomeStatusChip(status: order.trangThai),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _InfoLine(
-                icon: Icons.delete_outline,
-                text:
-                    '${waste?.tenLoaiRac ?? order.loaiRacId} • ${formatKg(order.khoiLuongDuKien)}',
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _InfoLine(
-                      icon: Icons.place_outlined,
-                      text: address?.shortAddress ?? order.diaChiId,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Flexible(
-                    child: Text(
-                      assigneeLabel,
-                      textAlign: TextAlign.right,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: statusColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PackageStat extends StatelessWidget {
-  const _PackageStat({
-    required this.value,
-    this.align = TextAlign.left,
-    this.color,
-  });
-
-  final String value;
-  final TextAlign align;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      value,
-      textAlign: align,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-        color: color ?? HomeTrialColors.slate,
-        fontWeight: FontWeight.w800,
-      ),
-    );
-  }
-}
-
-class _InfoLine extends StatelessWidget {
-  const _InfoLine({required this.icon, required this.text});
 
   final IconData icon;
+  final Color color;
   final String text;
 
   @override
@@ -1053,14 +954,15 @@ class _InfoLine extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 17, color: HomeTrialColors.slate),
+        Icon(icon, color: color, size: 20),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Text(
             text,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.text,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -1068,14 +970,135 @@ class _InfoLine extends StatelessWidget {
   }
 }
 
-CustomerAddress? _findAddress(List<CustomerAddress> addresses, String id) {
+class _CompactFact extends StatelessWidget {
+  const _CompactFact({required this.icon, required this.value});
+
+  final IconData icon;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 260),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17, color: AppColors.textMuted),
+          const SizedBox(width: AppSpacing.xs),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerDrawer extends StatelessWidget {
+  const _CustomerDrawer({
+    required this.user,
+    required this.onAddressBook,
+    required this.onLogout,
+  });
+
+  final AppUser user;
+  final VoidCallback onAddressBook;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      backgroundColor: AppColors.surface,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const BrandLogo(logoSize: 40),
+                  const SizedBox(height: AppSpacing.xxl),
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: AppColors.green100,
+                    child: Text(
+                      _initials(user.hoTen),
+                      style: const TextStyle(
+                        color: AppColors.primaryDark,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    user.hoTen,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    user.email,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.person_outline_rounded),
+              title: const Text('Tài khoản'),
+              onTap: () {},
+            ),
+            ListTile(
+              leading: const Icon(Icons.location_on_outlined),
+              title: const Text('Sổ địa chỉ'),
+              onTap: () {
+                Navigator.of(context).pop();
+                onAddressBook();
+              },
+            ),
+            const Spacer(),
+            ListTile(
+              leading: const Icon(Icons.logout_rounded),
+              title: const Text('Đăng xuất'),
+              onTap: onLogout,
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+PickupOrder? _findActiveOrder(List<PickupOrder> orders) {
+  for (final order in orders) {
+    if (order.trangThai != 'HOAN_THANH' && order.trangThai != 'HUY') {
+      return order;
+    }
+  }
+  return null;
+}
+
+CustomerAddress? _findAddress(List<CustomerAddress> addresses, String? id) {
+  if (id == null) return null;
   for (final address in addresses) {
     if (address.diaChiId == id) return address;
   }
   return null;
 }
 
-WasteType? _findWaste(List<WasteType> wastes, String id) {
+WasteType? _findWaste(List<WasteType> wastes, String? id) {
+  if (id == null) return null;
   for (final waste in wastes) {
     if (waste.loaiRacId == id) return waste;
   }
@@ -1088,4 +1111,42 @@ StaffProfile? _findStaff(List<StaffProfile> staff, String? id) {
     if (profile.nhanVienId == id) return profile;
   }
   return null;
+}
+
+String _activeOrderMessage(PickupOrder order, StaffProfile? staff) {
+  return switch (order.trangThai) {
+    'CHO_XU_LY' => 'Đang tìm nhân viên phù hợp trong khu vực của bạn.',
+    'CHO_NHAN' => 'Đang chờ ${staff?.maNhanVien ?? 'nhân viên'} xác nhận đơn.',
+    'DA_NHAN' => '${staff?.maNhanVien ?? 'Nhân viên'} đã nhận và chuẩn bị đi.',
+    'DANG_DEN' => '${staff?.maNhanVien ?? 'Nhân viên'} đang di chuyển đến bạn.',
+    'DA_DEN' => 'Nhân viên đã đến điểm lấy rác.',
+    'DANG_CAN_RAC' => 'Rác đang được kiểm tra và cân thực tế.',
+    _ => 'Đơn đang được GreenTrash cập nhật.',
+  };
+}
+
+void _openOrder(BuildContext context, PickupOrder order) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => OrderDetailScreen(maDon: order.maDon)),
+  );
+}
+
+void _showSupport(BuildContext context) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      const SnackBar(content: Text('Yêu cầu hỗ trợ đã được ghi nhận.')),
+    );
+}
+
+String _firstName(String fullName) {
+  final parts = fullName.trim().split(RegExp(r'\s+'));
+  return parts.isEmpty ? fullName : parts.last;
+}
+
+String _initials(String fullName) {
+  final parts = fullName.trim().split(RegExp(r'\s+'));
+  if (parts.isEmpty) return 'GT';
+  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+  return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
 }

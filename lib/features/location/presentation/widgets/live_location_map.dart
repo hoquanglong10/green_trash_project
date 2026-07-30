@@ -18,6 +18,9 @@ class LiveLocationMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!destination.hasPickupCoordinate) {
+      return const _MissingPickupLocationCard();
+    }
     final activeStaff = staff;
     if (activeStaff == null || !activeStaff.hasLiveLocation) {
       return const _WaitingForLiveLocationCard();
@@ -125,6 +128,31 @@ class LiveLocationMap extends StatelessWidget {
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MissingPickupLocationCard extends StatelessWidget {
+  const _MissingPickupLocationCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            const Icon(Icons.location_off_outlined, color: AppColors.warning),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                'Đơn cũ chưa có điểm thu gom trên bản đồ.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
           ],
         ),

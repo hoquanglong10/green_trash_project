@@ -11,23 +11,23 @@ class ActivityLogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceAlt,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: const Icon(
-                Icons.history,
-                color: AppColors.primaryDark,
-                size: 19,
+            const Padding(
+              padding: EdgeInsets.only(top: AppSpacing.xxs),
+              child: Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.primary,
+                size: 18,
               ),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -52,10 +52,14 @@ class ActivityLogCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            Text(
-              formatDateTime(log.thoiGian),
-              textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.labelSmall,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 92),
+              child: Text(
+                formatDateTime(log.thoiGian),
+                maxLines: 2,
+                textAlign: TextAlign.right,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
             ),
           ],
         ),

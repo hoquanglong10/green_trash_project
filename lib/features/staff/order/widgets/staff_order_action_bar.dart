@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../models/app_models.dart';
 import '../../../../providers/app_providers.dart';
+import '../../../../shared/widgets/app_widgets.dart';
 import '../staff_order_flow.dart';
 
 class StaffOrderActionBar extends ConsumerWidget {
@@ -58,15 +59,15 @@ class StaffOrderActionBar extends ConsumerWidget {
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               flex: 2,
-              child: FilledButton.icon(
+              child: PrimaryActionButton(
                 onPressed: () => acceptStaffOrder(
                   context,
                   ref,
                   order: order,
                   staffId: user.userId,
                 ),
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text('Nhận và chốt giờ'),
+                icon: Icons.check_circle_outline,
+                label: 'Nhận và chốt giờ',
               ),
             ),
           ],
@@ -98,7 +99,7 @@ class StaffOrderActionBar extends ConsumerWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             flex: 2,
-            child: FilledButton.icon(
+            child: PrimaryActionButton(
               onPressed: () {
                 if (action.nextStatus == null) {
                   completeStaffOrder(
@@ -117,8 +118,8 @@ class StaffOrderActionBar extends ConsumerWidget {
                   nextStatus: action.nextStatus!,
                 );
               },
-              icon: Icon(action.icon),
-              label: Text(action.label),
+              icon: action.icon,
+              label: action.label,
             ),
           ),
         ],
@@ -162,7 +163,8 @@ class _BottomActionSurface extends StatelessWidget {
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border)),
+        border: Border(top: BorderSide(color: AppColors.borderLight)),
+        boxShadow: AppShadows.topBar,
       ),
       child: SafeArea(
         top: false,

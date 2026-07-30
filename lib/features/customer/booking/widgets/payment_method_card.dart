@@ -23,51 +23,54 @@ class PaymentMethodCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: onTap == null ? 0.55 : 1,
-      child: Card(
-        color: AppColors.surface,
-        shape: RoundedRectangleBorder(
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
+        curve: AppMotion.emphasized,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.green50 : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          side: BorderSide(
+          border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
-            width: selected ? 1.3 : 1,
+            width: selected ? 1.5 : 1,
           ),
         ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: [
-                OptionIcon(icon: icon, selected: selected),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  OptionIcon(icon: icon, selected: selected),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                      ),
-                    ],
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Icon(
-                  selected ? Icons.check_circle : Icons.radio_button_off,
-                  color: selected ? AppColors.primary : AppColors.textMuted,
-                ),
-              ],
+                  Icon(
+                    selected ? Icons.check_circle : Icons.radio_button_off,
+                    color: selected ? AppColors.primary : AppColors.textMuted,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

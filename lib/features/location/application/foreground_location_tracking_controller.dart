@@ -79,9 +79,9 @@ class ForegroundLocationTrackingController
 
     late final LocationAccess access;
     try {
-      access = await _locationService
-          .requestAccess()
-          .timeout(const Duration(seconds: 15));
+      access = await _locationService.requestAccess().timeout(
+        const Duration(seconds: 15),
+      );
     } on TimeoutException {
       if (_staffId == staffId) {
         _isStarting = false;
@@ -134,9 +134,9 @@ class ForegroundLocationTrackingController
 
   Future<void> _publishInitialPosition(String staffId) async {
     try {
-      final position = await _locationService
-          .getCurrentPosition()
-          .timeout(const Duration(seconds: 20));
+      final position = await _locationService.getCurrentPosition().timeout(
+        const Duration(seconds: 20),
+      );
       await _publishPosition(staffId, position);
     } on TimeoutException {
       if (_staffId == staffId) {

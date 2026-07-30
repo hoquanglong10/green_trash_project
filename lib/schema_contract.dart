@@ -349,12 +349,12 @@ const greenTrashSchemas = <CollectionSchema>[
       SchemaField(
         name: 'toaDoLat',
         type: SchemaFieldType.number,
-        required: false,
+        required: true,
       ),
       SchemaField(
         name: 'toaDoLng',
         type: SchemaFieldType.number,
-        required: false,
+        required: true,
       ),
       SchemaField(
         name: 'macDinh',
@@ -547,6 +547,16 @@ const greenTrashSchemas = <CollectionSchema>[
       SchemaField(
         name: 'nhanVienHienTaiId',
         type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'nhanVienDeXuatId',
+        type: SchemaFieldType.string,
+        required: false,
+      ),
+      SchemaField(
+        name: 'offerExpiresAt',
+        type: SchemaFieldType.timestamp,
         required: false,
       ),
       SchemaField(

@@ -8,6 +8,7 @@ import '../../../models/app_models.dart';
 import '../../../providers/app_providers.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../../../shared/widgets/history_order_card.dart';
+import '../../../shared/widgets/home_dashboard_widgets.dart';
 import '../../customer/order_detail_screen.dart';
 import '../../staff/staff_order_screen.dart';
 
@@ -68,22 +69,25 @@ class OrderHistoryScreen extends ConsumerWidget {
                 );
               }
               final order = orders[index - 1];
-              return HistoryOrderCard(
-                order: order,
-                address: _findAddress(addresses, order.diaChiId),
-                wasteType: _findWaste(wastes, order.loaiRacId),
-                eventTime: isStaff
-                    ? historyOrderTimestamp(order)
-                    : order.ngayTao,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => isStaff
-                          ? StaffOrderScreen(maDon: order.maDon)
-                          : OrderDetailScreen(maDon: order.maDon),
-                    ),
-                  );
-                },
+              return AnimatedEntrance(
+                order: (index - 1).clamp(0, 5),
+                child: HistoryOrderCard(
+                  order: order,
+                  address: _findAddress(addresses, order.diaChiId),
+                  wasteType: _findWaste(wastes, order.loaiRacId),
+                  eventTime: isStaff
+                      ? historyOrderTimestamp(order)
+                      : order.ngayTao,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => isStaff
+                            ? StaffOrderScreen(maDon: order.maDon)
+                            : OrderDetailScreen(maDon: order.maDon),
+                      ),
+                    );
+                  },
+                ),
               );
             },
           );

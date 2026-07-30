@@ -207,6 +207,33 @@ void main() {
     );
   });
 
+  test('rejected targeted offer moves only to the next staff', () {
+    final repository = MockGreenTrashRepository();
+    final controller = OrderController(
+      initialOrders: repository.initialOrders,
+      staff: repository.staff,
+      addresses: repository.addresses,
+      addActivityLog: (_) {},
+      addNotification: (_) {},
+      saveCollectionRecord: (_) {},
+    );
+
+    expect(_order(controller, 'DON_002').nhanVienDeXuatId, 'USER_NV_001');
+    expect(
+      controller.rejectOffer(
+        maDon: 'DON_002',
+        nhanVienId: 'USER_NV_001',
+        reason: 'Đang ở xa điểm lấy',
+      ),
+      isTrue,
+    );
+
+    final forwarded = _order(controller, 'DON_002');
+    expect(forwarded.nhanVienDeXuatId, 'USER_NV_002');
+    expect(forwarded.nhanVienTuChoiIds, contains('USER_NV_001'));
+    expect(forwarded.offerAttempt, 2);
+  });
+
   test('dispatcher skips staff whose accepted order overlaps the slot', () {
     final repository = MockGreenTrashRepository();
     final controller = OrderController(

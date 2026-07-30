@@ -3,11 +3,12 @@
 ## Target
 This screen is now the canonical visual baseline for GreenTrash:
 
-1. Green `#10B981` AppBar
-2. Full white `BrandWordmark` centered in the header, using `docs/logo/logo_mark.png` plus vector text for smooth rendering
-3. Light gray `#F3F4F6` page background
-4. White cards with subtle slate-opacity borders
-5. Green-led greeting/status promo composition adapted to pickup workflows; blue is a small operational accent only, not a new visual language or a new gradient treatment
+1. Responsive `DashboardShell` with a compact white AppBar
+2. Full-color `BrandLogo` aligned to the start of the product header
+3. Neutral gray page background
+4. White cards with `#DFE6DF` borders and minimal depth
+5. Preserve the forest-to-leaf greeting gradient and its pickup workflow
+   hierarchy
 6. Compact search/status area
 7. Promo/status card for current subscription
 8. Primary CTA to book pickup
@@ -15,8 +16,39 @@ This screen is now the canonical visual baseline for GreenTrash:
 10. Notification bell opens a compact preview popup; notification cards do not
    occupy Home content space.
 
+## V3 composition
+
+- The app bar is 64px high. Mobile uses a bottom navigation bar and a drawer;
+  wide screens use a navigation rail.
+- `Dia chi` opens the customer address book from bottom navigation, navigation
+  rail or the mobile drawer.
+- The greeting hero uses the restrained green900-green700 gradient. It must not contain a
+  separate olive color block.
+- The active order includes an animated journey bar so status changes are
+  understandable before opening order details.
+- Subscription usage animates once when data appears or changes.
+- Package, recent-order and information rows use filled Material icons without
+  repeated decorative tiles. Yellow is limited to pending and premium details.
+- Dashboard sections use a brief staggered entrance and honor reduced-motion
+  settings.
+- On wide screens, action/tracking content and recent activity form balanced
+  columns. Mobile retains a single clear vertical flow.
+- The first viewport follows the task hierarchy: personal greeting, active
+  order, then shortcuts and package information.
+
 ## Rules
-Use compact cards, green primary actions, blue for in-progress states, amber for pending states, purple for utility/support accents, slate text, and small section titles.
+Use compact cards, solid green600 primary actions, blue for in-progress states,
+sunflower yellow for pending details, semantic red for cancellation, and the
+three text roles from `AppColors`. Keep status icons and labels visible.
+
+Order cards display a shortened `Đơn #XXXXXXXX` label while preserving the
+full Firestore ID for navigation and detail behavior.
+
+The Home screen must pass without overflow at 320, 375, 390 and 430px.
+
+When an active order exists, Home changes its hero action to `Xem tiến trình`
+and hides new-booking shortcuts. This prevents the customer from entering a
+flow that overlap validation will reject.
 
 ## Notifications
 

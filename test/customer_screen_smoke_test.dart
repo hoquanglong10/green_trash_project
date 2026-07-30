@@ -5,6 +5,7 @@ import 'package:green_trash_project/core/theme/app_theme.dart';
 import 'package:green_trash_project/features/customer/booking_screen.dart';
 import 'package:green_trash_project/features/customer/customer_home_screen.dart';
 import 'package:green_trash_project/features/customer/order_detail_screen.dart';
+import 'package:green_trash_project/features/notifications/presentation/customer_notifications_screen.dart';
 import 'package:green_trash_project/models/app_models.dart';
 import 'package:green_trash_project/providers/app_providers.dart';
 import 'package:green_trash_project/shared/widgets/app_widgets.dart';
@@ -43,17 +44,14 @@ void main() {
     await pumpCustomerScreen(tester, const CustomerHomeScreen());
 
     expect(tester.takeException(), isNull);
-    expect(find.byType(BrandWordmark), findsOneWidget);
+    expect(find.byType(BrandLogo), findsOneWidget);
   });
 
   testWidgets('booking screen renders on mobile', (tester) async {
     await pumpCustomerScreen(tester, const BookingScreen());
 
     expect(tester.takeException(), isNull);
-    expect(
-      find.text('Lập đơn thu gom mới', skipOffstage: false),
-      findsOneWidget,
-    );
+    expect(find.text('Đặt lịch thu gom', skipOffstage: false), findsOneWidget);
     expect(find.text('Địa chỉ lấy rác', skipOffstage: false), findsOneWidget);
   });
 
@@ -66,5 +64,14 @@ void main() {
       find.text('Đang chờ nhân viên nhận', skipOffstage: false),
       findsOneWidget,
     );
+  });
+
+  testWidgets('notification list renders without unbounded-height errors', (
+    tester,
+  ) async {
+    await pumpCustomerScreen(tester, const CustomerNotificationsScreen());
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Thông báo'), findsOneWidget);
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -9,6 +10,7 @@ import '../../orders/domain/order_workflow_models.dart';
 import '../../../models/app_models.dart';
 import '../../../providers/app_providers.dart';
 import '../../../shared/widgets/order_reason_sheet.dart';
+import '../domain/staff_availability.dart';
 import 'widgets/arrival_time_sheet.dart';
 import 'widgets/collection_confirmation_sheet.dart';
 
@@ -18,11 +20,23 @@ Future<bool> acceptStaffOrder(
   required PickupOrder order,
   required String staffId,
 }) async {
+  final profile = _findStaffProfile(ref, staffId);
+  if (profile != null && !isStaffAvailable(profile.trangThaiLamViec)) {
+    if (context.mounted) {
+      _showMessage(
+        context,
+        'Hãy bật "Vị trí nhận đơn" trước khi nhận đơn mới.',
+      );
+    }
+    return false;
+  }
+
   final arrival = await showArrivalTimeSheet(context, order: order);
   if (arrival == null) return false;
   if (!context.mounted) return false;
 
-  final accepted = ref.read(firebaseEnabledProvider)
+  final firebaseEnabled = ref.read(firebaseEnabledProvider);
+  final accepted = firebaseEnabled
       ? await _claimFirestoreOrder(
           context,
           ref,
@@ -31,7 +45,7 @@ Future<bool> acceptStaffOrder(
           arrival: arrival,
         )
       : _acceptMockOrder(ref, order: order, staffId: staffId, arrival: arrival);
-  if (context.mounted && !accepted) {
+  if (context.mounted && !accepted && !firebaseEnabled) {
     _showMessage(context, 'Đơn đã thay đổi. Vui lòng tải lại danh sách.');
   }
   return accepted;
@@ -381,12 +395,35 @@ Future<bool> _runFirestoreAction(
   } on OrderWorkflowException catch (error) {
     if (context.mounted) _showMessage(context, error.message);
     return false;
+  } on FirebaseException catch (error) {
+    if (context.mounted) {
+      _showMessage(context, _firebaseActionMessage(error.code));
+    }
+    return false;
   } catch (_) {
     if (context.mounted) {
-      _showMessage(context, 'Khong the cap nhat du lieu. Vui long thu lai.');
+      _showMessage(context, 'Không thể cập nhật dữ liệu. Vui lòng thử lại.');
     }
     return false;
   }
+}
+
+StaffProfile? _findStaffProfile(WidgetRef ref, String staffId) {
+  for (final profile in ref.read(staffProfilesProvider)) {
+    if (profile.nhanVienId == staffId) return profile;
+  }
+  return null;
+}
+
+String _firebaseActionMessage(String code) {
+  return switch (code) {
+    'permission-denied' =>
+      'Firestore từ chối thao tác. Kiểm tra trạng thái nhận đơn và quyền nhân viên.',
+    'aborted' =>
+      'Đơn vừa được cập nhật ở thiết bị khác. Vui lòng tải lại danh sách.',
+    'unavailable' => 'Mất kết nối Firestore. Vui lòng thử lại.',
+    _ => 'Không thể cập nhật dữ liệu Firestore ($code).',
+  };
 }
 
 Future<void> _showCompletionSuccess(

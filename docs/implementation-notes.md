@@ -10,10 +10,15 @@ offline work and widget tests.
 
 Implemented customer/staff flow:
 
+- Customers can create, edit, delete and choose a default pickup address.
+  Firestore writes use `DIA_CHI`; the mock address controller preserves the
+  same default-address invariant for tests and offline UI work.
 - A customer creates and cancels a pickup order, then sees order details,
   status timeline, logs, and payment data.
-- New orders enter one shared open queue for available staff. The first atomic
-  Firestore claim wins; a staff member can also dismiss an order for themselves.
+- New orders are offered to one available staff member at a time. Candidates
+  are ranked by GPS distance, then district/revenue/ID when GPS is missing.
+- A rejection moves the offer to the next candidate. A busy staff member sees
+  no new offers until the active order finishes or is cancelled.
 - Staff can set/update ETA, move through collection statuses, create BM02 and
   payment data, and complete the order.
 - Customer/staff cancellation, activity history, and notifications follow the
@@ -32,18 +37,23 @@ the app cannot pass the audited Firestore Rules. A hot restart resets only the
 mock fallback, never the Firestore path.
 
 Foreground GPS is intentionally limited to the active staff order screen. It
-does not track in the background, provide turn-by-turn routing, or calculate
-automatic nearest-staff dispatch. See `docs/backend-order-workflow.md`.
+does not track in the background or provide turn-by-turn routing. Dispatch uses
+the latest saved coordinate and falls back deterministically when GPS is
+missing. See `docs/backend-order-workflow.md`.
 
 ## Architecture already in place
 
 - `lib/core/theme/app_theme.dart`: palette, spacing, radii, sizes, and Material theme.
 - `lib/shared/widgets/app_widgets.dart`: reusable logo, page shell, inputs, actions, cards, chips, timelines, and empty states.
 - `lib/features/customer/booking/`: booking screen split into small reusable widgets and calculator.
+- `lib/features/customer/address_book/`: customer address list, responsive
+  form, optional foreground GPS capture and Firestore/mock actions.
 - `lib/features/customer/order_detail/`: order detail screen split into lookup and presentation widgets.
 - `lib/features/staff/order/`: staff claim, ETA, status transition, collection record, and completion UI.
 - `lib/providers/app_providers.dart`: Riverpod selectors plus temporary in-memory order, staff, payment, package, history, and notification state.
-- `lib/providers/order_controller.dart`: the single mock workflow authority for the open queue and order transitions.
+- `lib/providers/order_controller.dart`: the mock workflow authority for targeted dispatch and order transitions.
+- `lib/features/orders/domain/staff_dispatch_ranker.dart`: shared GPS/fallback
+  candidate ordering used by mock and Firestore flows.
 - `lib/providers/mock_event_controllers.dart`: small in-memory stores for profiles, package usage, records, payments, logs, and notifications.
 - `lib/features/orders/domain/`: production order commands, assignment model,
   repository contract, and workflow errors.

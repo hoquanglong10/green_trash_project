@@ -11,11 +11,12 @@
             "type": "dart"
         },
         {
-            "name": "GreenTrash - Android phone (ADB Wi-Fi)",
+            "name": "GreenTrash - Android phone (auto-detect)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "debug",
-            "deviceId": "192.168.102.2:43749",
+            "deviceId": "192.168.102.2:33445",
+
             "debugSdkLibraries": false,
             "debugExternalLibraries": false
         },

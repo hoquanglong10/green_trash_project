@@ -4,7 +4,12 @@
 Use `docs/references/auth-home-reference.png`.
 
 ## Target
-Current requested variant: no green AppBar. Use light gray background, a large centered real GreenTrash logo mark from `docs/logo/logo_mark.png`, slogan directly below the logo, small labels, rounded 8px inputs, green primary button, gray helper controls, official Google/Facebook provider logo colors, and a blue sign-up link.
+V3 uses no AppBar. Keep the approved centered composition on every viewport:
+a large, sharp GreenTrash mark, brand name and slogan sit above the direct
+form. The form stays centered and is capped at 460px on wide screens rather
+than becoming a split marketing layout. Use 12px-radius inputs, a solid primary
+CTA, compact helper controls, official Google/Facebook provider colors and a
+clear sign-up link.
 
 ## Must use
 - `AppColors`, `AppSpacing`, `AppRadius`, `AppSizes`
@@ -15,6 +20,7 @@ Current requested variant: no green AppBar. Use light gray background, a large c
 
 ## Must not use
 - full-screen hero illustration
-- large gradient hero block
-- pill-shaped 28px inputs/buttons
+- split brand/form marketing panel
+- decorative color band above the logo
+- oversized pill inputs/buttons
 - unrelated colors

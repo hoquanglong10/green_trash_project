@@ -12,10 +12,90 @@ class TrackingHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return HomeBrandHeader(
-      title: _heroTitle(order),
-      subtitle: _heroSubtitle(order, staff),
-      trailing: _TrackingStatusVisual(status: order.trangThai),
+    final waiting = order.trangThai == 'CHO_XU_LY' ||
+        order.trangThai == 'CHO_NHAN';
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: AppGradients.hero,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: AppShadows.hero,
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: AppColors.accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'CẬP NHẬT TRỰC TIẾP',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: AppColors.textInverseMuted,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        _heroTitle(order),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: AppColors.textInverse,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        _heroSubtitle(order, staff),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textInverseMuted,
+                              height: 1.4,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                _TrackingStatusVisual(status: order.trangThai),
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.md,
+              AppSpacing.xl,
+              AppSpacing.lg,
+            ),
+            color: AppColors.opacity(AppColors.green950, 0.24),
+            child: waiting
+                ? _WaitingSummary(order: order)
+                : _AssignedStaffSummary(order: order, staff: staff),
+          ),
+        ],
+      ),
     );
   }
 
@@ -58,6 +138,119 @@ class TrackingHero extends StatelessWidget {
 
   String _formatTime(DateTime value) {
     return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+class _WaitingSummary extends StatelessWidget {
+  const _WaitingSummary({required this.order});
+
+  final PickupOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.radar_rounded,
+              color: AppColors.accent,
+              size: 18,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                order.waitingForSupport
+                    ? 'Hệ thống đang mở rộng phạm vi tìm kiếm'
+                    : 'Đang gửi đơn đến nhân viên sẵn sàng',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppColors.textInverse,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        const ClipRRect(
+          borderRadius: BorderRadius.all(Radius.circular(AppRadius.pill)),
+          child: LinearProgressIndicator(
+            minHeight: 4,
+            backgroundColor: Color(0x35FFFFFF),
+            color: AppColors.accent,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AssignedStaffSummary extends StatelessWidget {
+  const _AssignedStaffSummary({required this.order, required this.staff});
+
+  final PickupOrder order;
+  final StaffProfile? staff;
+
+  @override
+  Widget build(BuildContext context) {
+    final eta = order.gioChot;
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: const Icon(
+            Icons.person_pin_circle_rounded,
+            color: AppColors.primary,
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                staff?.maNhanVien ?? 'Nhân viên đang cập nhật',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.textInverse,
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                eta == null
+                    ? 'Khung giờ ${order.khungGio}'
+                    : 'Dự kiến ${_time(eta)} • ${order.khungGio}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textInverseMuted,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        const Icon(
+          Icons.wifi_tethering_rounded,
+          color: AppColors.accent,
+          size: 20,
+        ),
+      ],
+    );
+  }
+
+  String _time(DateTime value) {
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 }
 
@@ -186,6 +379,20 @@ class _SearchingLogoState extends State<_SearchingLogo>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) {
+      _controller
+        ..stop()
+        ..value = 0.5;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
   }
 
   @override

@@ -135,15 +135,9 @@ class _NotificationPopoverState extends State<_NotificationPopover> {
             child: Container(
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: AppColors.border),
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.borderLight,
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(color: AppColors.borderLight),
+                boxShadow: AppShadows.raised,
               ),
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.md),

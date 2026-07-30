@@ -63,6 +63,15 @@ final staffProfilesProvider = Provider<List<StaffProfile>>((ref) {
   return ref.watch(staffProfileControllerProvider);
 });
 
+final customerAddressControllerProvider =
+    StateNotifierProvider<CustomerAddressController, List<CustomerAddress>>((
+      ref,
+    ) {
+      return CustomerAddressController(
+        ref.watch(greenTrashRepositoryProvider).addresses,
+      );
+    });
+
 final customerAddressesProvider = Provider<List<CustomerAddress>>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return const [];
@@ -72,10 +81,15 @@ final customerAddressesProvider = Provider<List<CustomerAddress>>((ref) {
             .valueOrNull ??
         const [];
   }
-  final addresses = ref.watch(greenTrashRepositoryProvider).addresses;
-  return addresses
+  final addresses = ref.watch(customerAddressControllerProvider);
+  final customerAddresses = addresses
       .where((address) => address.khachHangId == user.userId)
       .toList();
+  customerAddresses.sort((first, second) {
+    if (first.macDinh != second.macDinh) return first.macDinh ? -1 : 1;
+    return first.diaChiChiTiet.compareTo(second.diaChiChiTiet);
+  });
+  return customerAddresses;
 });
 
 final allAddressesProvider = Provider<List<CustomerAddress>>((ref) {
@@ -86,7 +100,7 @@ final allAddressesProvider = Provider<List<CustomerAddress>>((ref) {
     }
     return ref.watch(firestoreAllAddressesProvider).valueOrNull ?? const [];
   }
-  return ref.watch(greenTrashRepositoryProvider).addresses;
+  return ref.watch(customerAddressControllerProvider);
 });
 
 final wasteTypesProvider = Provider<List<WasteType>>((ref) {
@@ -235,7 +249,7 @@ final orderControllerProvider =
         initialOrders: repository.initialOrders,
         staff: repository.staff,
         addresses: repository.addresses,
-        dispatchMode: OrderDispatchMode.openQueue,
+        dispatchMode: OrderDispatchMode.targetedOffer,
         addActivityLog: ref.read(activityLogControllerProvider.notifier).add,
         addNotification: ref.read(notificationControllerProvider.notifier).add,
         saveCollectionRecord: ref
@@ -251,6 +265,7 @@ final orderControllerProvider =
                   .consume(customerId: customerId, kg: kg);
             },
         readStaffProfiles: () => ref.read(staffProfileControllerProvider),
+        readAddresses: () => ref.read(customerAddressControllerProvider),
         updateStaffStatus: (staffId, status) {
           ref
               .read(staffProfileControllerProvider.notifier)
@@ -326,6 +341,19 @@ final staffOrderHistoryProvider = Provider<List<PickupOrder>>((ref) {
 final staffOfferOrdersProvider = Provider<List<PickupOrder>>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return const [];
+  final activeOrders = ref.watch(staffOrdersProvider);
+  StaffProfile? profile;
+  for (final item in ref.watch(staffProfilesProvider)) {
+    if (item.nhanVienId == user.userId) {
+      profile = item;
+      break;
+    }
+  }
+  if (activeOrders.isNotEmpty ||
+      profile == null ||
+      !{'SAN_SANG', 'DANG_RANH'}.contains(profile.trangThaiLamViec)) {
+    return const [];
+  }
   if (ref.watch(firebaseEnabledProvider)) {
     return ref.watch(firestoreOpenOrdersProvider(user.userId)).valueOrNull ??
         const [];
@@ -335,6 +363,7 @@ final staffOfferOrdersProvider = Provider<List<PickupOrder>>((ref) {
       .where(
         (order) =>
             order.trangThai == 'CHO_XU_LY' &&
+            order.nhanVienDeXuatId == user.userId &&
             !order.nhanVienTuChoiIds.contains(user.userId),
       )
       .toList()

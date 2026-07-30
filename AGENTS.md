@@ -1,7 +1,11 @@
 # AGENTS.md
 
 ## Role
-You are a senior Flutter mobile frontend engineer. This project uses Flutter with Riverpod. Your job is to implement UI that strictly follows the GreenTrash design system and the uploaded green-and-white mobile reference.
+You are a senior Flutter mobile frontend engineer. This project uses Flutter
+with Riverpod. Your job is to implement UI that strictly follows the
+GreenTrash V3 Calm Utility design system. The uploaded reference remains a
+workflow reference, while the V3 token documents are the visual source of
+truth.
 
 ## Mandatory design sources
 Before implementing, editing, or refactoring any UI, always read:
@@ -16,9 +20,10 @@ Before implementing, editing, or refactoring any UI, always read:
 Do not start coding before checking these files.
 
 ## Core UI rule
-The app must look like one coherent green-and-white mobile product inspired by the provided Login, Sign Up, Forgot Password, Verify OTP, and Home references.
+The app must look like one coherent commercial eco-service product using the
+V3 Calm Utility system.
 
-Creative layout is allowed. Creative visual language is not allowed.
+Creative layout is allowed inside the shared V3 visual language.
 
 When a future screen has no exact design, build a new layout from existing tokens and shared widgets. Do not invent a new style.
 
@@ -31,14 +36,17 @@ When a future screen has no exact design, build a new layout from existing token
 - Do not hardcode one-off colors, spacing, radius, typography, shadows, or component sizes inside screens.
 
 ## Non-negotiable UI restrictions
-- Do not introduce new brand colors.
+- Do not introduce colors outside the V3 `AppColors` palette.
 - Do not introduce new button styles.
 - Do not introduce new input styles.
 - Do not introduce new header styles.
-- Do not introduce a new typography scale.
-- Do not introduce heavy shadows, glassmorphism, neumorphism, bright gradients, or oversized decorative UI.
-- Do not use large rounded pill inputs/buttons for auth screens; the reference uses compact 8px-style radius.
-- Do not replace the green app header with unrelated navigation UI.
+- Do not introduce a typography scale outside V3 tokens.
+- Do not introduce heavy shadows, glassmorphism, neumorphism, neon gradients,
+  or oversized decorative UI.
+- Gradients are reserved for V3 operational heroes. AppBars and primary CTAs are solid.
+- Sunflower yellow is reserved for compact attention details and must not fill large UI.
+- Do not use large pill inputs/buttons for auth screens; V3 uses 12px radius.
+- Keep the app header white and reserve green900 for brand/operational heroes.
 - Do not modify unrelated screens.
 
 ## Required implementation workflow
@@ -74,19 +82,28 @@ Use or extend these shared widgets before creating one-off screen styles:
 - `StatusChip`
 - `OrderTimeline`
 - `EmptyState`
+- `AppLoadingView`
+- `AppErrorState`
+- `AccentIcon`
+- `AnimatedEntrance`
+- `DashboardHero`
+- `DashboardMetricCard`
+- `AnimatedProgressBar`
+- `OrderJourneyBar`
 
 ## Visual target
 The final UI should visually match the reference direction:
 
-- green top header
-- white background
-- compact mobile layout
-- small typography
-- rounded 8-12px inputs, cards, and buttons
-- subtle borders
-- minimal shadow
-- green primary actions
-- lightweight cards
+- white product header with a quiet divider
+- neutral gray background and layered white surfaces
+- compact mobile-first layout
+- readable V3 typography hierarchy
+- 12px controls, 16px cards and 22px modal surfaces
+- subtle borders and soft depth
+- solid green600 primary actions
+- deep botanical identity on white/neutral gray, with semantic accents
+- purposeful animation with reduced-motion support
 - food-delivery-style home composition adapted to GreenTrash pickup workflows
 
-If there is uncertainty, choose the option that looks closest to `docs/references/auth-home-reference.png`.
+If there is uncertainty, choose the option that matches
+`docs/design-tokens.md` and preserves the structure of the visual reference.

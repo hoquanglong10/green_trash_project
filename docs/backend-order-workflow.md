@@ -2,21 +2,25 @@
 
 ## Chosen scope for the course project
 
-GreenTrash uses a Spark-compatible open-order queue for the main customer and
-staff flow. Cloud Functions, scheduled jobs, nearest-distance matching, and
-FCM push delivery are optional extensions, not requirements for the submitted
-project.
+GreenTrash uses Spark-compatible targeted dispatch for the main customer and
+staff flow. The Flutter client ranks available staff and writes the selected
+staff ID in a Firestore transaction. Cloud Functions, scheduled jobs, and FCM
+push delivery are not required for the submitted project.
 
 ```text
 Customer creates order
   -> CHO_XU_LY
-  -> all available staff can see the order
-  -> the first successful atomic claim wins
+  -> rank available staff by GPS distance
+  -> only the selected staff can see the offer
+  -> reject: send to the next nearest available staff
+  -> accept: lock that staff until the order finishes
   -> DA_NHAN -> DANG_DEN -> DA_DEN -> DANG_CAN_RAC -> HOAN_THANH
 ```
 
-This design keeps the food-delivery-style workflow without requiring the Blaze
-billing plan. Admin assignment remains an exception tool.
+If GPS is missing, ranking falls back to district, current revenue, then staff
+ID for deterministic ordering. If no candidate is available, the order remains
+`CHO_XU_LY` with `dangChoHoTro = true`. Admin assignment remains an exception
+tool. This design does not require the Blaze billing plan.
 
 ## Runtime status
 
@@ -26,11 +30,12 @@ is retained only as the offline/widget-test fallback. The Firestore layer now
 handles:
 
 - Customer and staff order streams.
-- Open-order stream for staff.
+- Targeted-offer stream for staff.
 - Atomic create, claim, dismiss, ETA, status, completion, cancellation, and
   payment operations.
 - Firestore Rules for the uppercase audited collections.
-- Composite indexes for customer, staff, and open-order queries.
+- Composite indexes for customer and staff history queries; the targeted offer
+  lookup uses the single `nhanVienDeXuatId` field index.
 - BM02, payment, package usage, activity-log, and notification writes.
 
 Still required for a full live verification:
@@ -68,10 +73,16 @@ coordinate fields already present in `NHAN_VIEN_THU_GOM`.
 `DON_THU_GOM` is the order aggregate.
 
 - A new order has `trangThai = CHO_XU_LY`.
+- `nhanVienDeXuatId` identifies the only staff member allowed to see and
+  respond to the current offer.
+- `offerExpiresAt` records the offer deadline for UI/audit display. The
+  classroom client does not automatically move an expired offer while every
+  app is closed.
 - `nhanVienHienTaiId` and `phanCongHienTaiId` are absent until acceptance.
-- `nhanVienTuChoiIds` stores staff who dismissed the order so it can be hidden
-  from their own open-order list.
-- `soLanDeXuat` counts claim/dismiss responses for simple audit display.
+- `nhanVienTuChoiIds` stores staff who rejected the order and prevents them
+  from being selected again.
+- `soLanDeXuat` counts how many staff members received the offer.
+- `dangChoHoTro = true` means no eligible next candidate was found.
 
 `PHAN_CONG_THU_GOM` records the staff response:
 
@@ -80,20 +91,31 @@ CHO_XU_LY + staff claim   -> PHAN_CONG_THU_GOM.DA_NHAN
 CHO_XU_LY + staff dismiss -> PHAN_CONG_THU_GOM.TU_CHOI
 ```
 
-Claiming uses one Firestore transaction to create the assignment and update
-the order. If two staff members claim simultaneously, only the transaction
-that still reads `CHO_XU_LY` can succeed.
+Accepting uses one Firestore transaction to create the assignment, update the
+order, and change the staff status to `DANG_THU_GOM`. Rejecting also uses a
+transaction to audit the rejection and replace `nhanVienDeXuatId` with the
+next ranked candidate.
 
 ## Staff visibility
 
-The classroom workflow intentionally does not calculate geographic distance.
-An active staff account can query all `CHO_XU_LY` orders and the app filters
-orders the staff member already dismissed. The staff profile must use
-`SAN_SANG` or the audited legacy value `DANG_RANH` before claiming.
+An active staff account queries only orders whose
+`nhanVienDeXuatId == request.auth.uid`. Firestore Rules also prevent staff from
+reading or responding to another staff member's offer. The staff profile must
+use `SAN_SANG` or the audited legacy value `DANG_RANH`.
 
-Work-hour and schedule-conflict checks remain in the mock UI. They can be kept
-as client validation for the course demo; the atomic order status is the
-server-side guard against duplicate acceptance.
+Availability is locked only while the staff member has a real active order. A
+stale `DANG_THU_GOM` value with no active order can be toggled back to
+`SAN_SANG`. The UI reports an unavailable-staff or Firestore permission error
+directly instead of replacing it with a generic order-changed message.
+
+An accepted but unfinished order, including `DA_NHAN`, locks availability.
+The accept transaction changes `NHAN_VIEN_THU_GOM.trangThaiLamViec` to
+`DANG_THU_GOM`, preventing the same staff member from accepting another order.
+Completion or cancellation changes it back to `SAN_SANG`.
+
+The staff home also hides the entire new-offer section while an active order
+exists. Work-hour checks are applied during candidate ranking. The transaction
+rechecks staff availability before create, accept, or handoff.
 
 ## Security identity
 
@@ -113,7 +135,8 @@ be `ACTIVE`.
 
 1. Back up Firestore.
 2. Confirm Auth UIDs match the uppercase profile document IDs.
-3. Add `nhanVienTuChoiIds: []` to new or pending order data when needed.
+3. Pending legacy orders without `nhanVienDeXuatId` remain in support waiting.
+   Assign them manually or recreate them before the demo.
 4. Verify Rules and indexes without deploying:
 
 ```sh
@@ -122,8 +145,8 @@ npx firebase-tools@latest deploy --only firestore --dry-run
 
 5. Deploy Firestore Rules and indexes after review.
 6. Run the Flutter app and sign in with an existing customer or staff account.
-7. Test create, dismiss, simultaneous claim, status updates, completion, and
-   cancellation using two accounts.
+7. Test create, reject-to-next-staff, accept, busy-staff hiding, status
+   updates, completion, and cancellation using at least two staff accounts.
 
 No Cloud Functions deployment or Blaze upgrade is required for this workflow.
 The existing `functions/` directory is retained only as an optional advanced

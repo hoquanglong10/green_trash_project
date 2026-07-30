@@ -1,99 +1,79 @@
-# GreenTrash UI Style Guide
+# GreenTrash V3 UI Style Guide
 
-## Product style
-GreenTrash is a clean, compact, green-and-white mobile app for waste pickup booking, order assignment, and collection operations.
+## Product direction
 
-The reference UI includes Login, Sign Up, Forgot Password, Verify OTP, and Home screens. GreenTrash adapts that visual language to waste pickup workflows.
+GreenTrash V3 is a calm, operational eco-service product. The interface is
+designed around tasks, status and readable data rather than decorative cards.
+It should feel trustworthy, current and useful during a pickup.
 
-## Visual identity
-The UI must feel:
+The visual language uses:
 
-- simple
-- clean
-- compact
-- mobile-first
-- white-background based
-- green brand-led
-- lightly bordered
-- rounded but not pill-heavy
-- easy to scan during pickup/order operations
+- a white product header with dark botanical text and icons
+- cool neutral gray page canvas
+- white content surfaces with quiet borders
+- deep botanical green for brand moments and primary actions
+- yellow, blue, green and red only for semantic status
+- spacing and typography instead of decorative containers
+- short motion that explains entry, progress and state changes
 
-## Auth screens
-Auth screens follow this pattern:
+## Information hierarchy
 
-1. No AppBar in the current reference variant
-2. Centered real GreenTrash logo mark from `docs/logo/logo_mark.png`
-3. Slogan directly below the logo
-4. Compact labels and rounded 8px inputs
-5. Full-width green primary button
-6. Gray helper controls for remember/forgot/demo roles
-7. Provider buttons with official Google/Facebook logo colors
-8. Footer navigation link, with sign-up link in blue
+Each screen must answer these questions in order:
 
-Avoid large hero illustrations, oversized titles, large gradients, or decorative shapes on auth screens.
+1. Where am I?
+2. What is the current state?
+3. What should I do next?
+4. What supporting information do I need?
 
-## Main screens
-Customer Home is the visual baseline for customer, staff, and admin screens:
+Do not give every block the same visual weight. Operational state and the next
+action come before metadata and history.
 
-1. Green AppBar
-2. Full white GreenTrash wordmark centered in the header
-3. Menu icon on the left and notification icon on the right for Home-style screens
-4. Light gray page background
-5. White cards with subtle borders and minimal shadow
-6. Compact promotional/status header card
-7. Section headers
-8. Lightweight cards/lists
-9. Bottom action bars for important flows
-10. Bottom navigation on customer-style mobile screens when needed
+## Auth
 
-## Order flows
-Customer booking and staff collection flows must stay operationally clear:
+- Auth uses the approved centered logo-and-form composition.
+- The form remains centered with a 460px maximum width on wide screens.
+- Forms are not placed in a floating marketing card.
+- Inputs and actions use 12px radius and explicit error/loading states.
+- Real GreenTrash assets and official provider marks are required.
 
-- selected states use mint/green
-- status chips use compact rounded chips
-- primary action buttons stay green
-- destructive actions use outlined or error styling
-- progress/timeline components must remain compact
+## Customer
 
-## Responsive List Pages
+- Home uses `DashboardShell`: white product header, bottom navigation on mobile
+  and navigation rail on wide screens.
+- The deep-green greeting hero remains, but the active order is the primary
+  operational module directly below it.
+- An active order replaces new-booking shortcuts with a direct progress action.
+- Booking is a four-part workflow: address, waste, schedule, confirmation.
+- Tracking leads with current state, then pickup facts, map, timeline and logs.
+- Home shows two recent orders; the full list lives on History.
+- Notifications use an anchored preview and a responsive full list.
 
-List pages such as notifications, order history, invoices, and future admin
-lists use the same responsive shell:
+## Staff
 
-1. `AppPage(maxWidth: 900)` so desktop/web content uses the available space.
-2. A `LayoutBuilder` sets horizontal padding to `AppSpacing.screenHorizontal`
-   on mobile and `AppSpacing.xl` from 720 px upward.
-3. List cards fill the available content width; do not constrain them to a
-   mobile-width column on web.
-4. Wrap the list in a native `Scrollbar` only when `kIsWeb` is true. Mobile
-   uses platform scrolling without a visible scrollbar.
+- Home uses the same responsive shell and is an operations console: shift
+  state, availability, live metrics, active work, offers, then recent history.
+- Offers expose only the facts needed to accept or dismiss.
+- Active-order screens keep the next valid action in the bottom action surface.
+- Location sharing, progress and collection evidence remain explicit.
 
-## Creative rule
-When creating a new screen without an exact reference:
+## Admin
 
-Allowed:
-- new arrangement of existing components
-- new combinations of order cards, metric cards, forms, and action bars
-- new content hierarchy
+- Admin uses the shared responsive dashboard shell and remains a compact data
+  workspace, not a marketing dashboard.
+- Overview metrics, exception orders and staff availability are primary.
+- Manual assignment is an exception workflow, not the normal dispatch path.
 
-Not allowed:
-- new color palette
-- new typography scale
-- new header style
-- new button/input/card visual language
-- heavy decoration or unrelated modern UI trends
+## Responsive behavior
 
-The screen can be creatively composed, but it must still look like the same app as the reference.
+- Mobile content padding is 16px.
+- Wide content uses a maximum width of 760px for flows, 900px for lists and
+  1120-1180px for responsive dashboards.
+- Dashboard columns split only when each column remains readable.
+- Cards and rows fill the available content width.
+- Native scrollbars are web-only.
+- All screens must work at 360px without overflow.
 
-## Palette rule
-Use only the official GreenTrash palette from `docs/design-tokens.md`:
+## Motion
 
-- Green `#10B981`
-- Blue `#2563EB`
-- Amber `#F59E0B`
-- Purple `#8B5CF6`
-- Slate `#1F2937`
-- Gray `#F3F4F6`
-- White `#FFFFFF`
-
-Borders, muted text, and soft backgrounds must be opacity variants of these colors.
+Use entrance, progress and state-change animation only. Honor reduced motion.
+Never loop decoration or delay an order action.

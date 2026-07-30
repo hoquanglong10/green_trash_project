@@ -4,7 +4,9 @@
 Use `docs/references/auth-home-reference.png`.
 
 ## Target
-No green AppBar in the current requested variant. Use a compact inline back header, compact helper text, four OTP cells/underlines, resend copy, green confirm button.
+Use the centered V3 auth scaffold and direct form surface, a compact inline back
+header, helper text, four OTP cells, resend copy and the shared primary confirm
+button.
 
 ## Rules
 OTP fields must be minimal, not large decorative boxes.

@@ -7,7 +7,7 @@ This is the self-contained project brief for any contributor using ChatGPT, Gemi
 GreenTrash is a Vietnamese waste-pickup application with three roles:
 
 - **Customer**: manages addresses, chooses a waste type and time slot, books pickup, tracks the order, pays, manages a monthly package, views history, and submits complaints/reviews.
-- **Collection staff**: sees the shared open-order queue, claims or dismisses an order, travels to the pickup point, records actual waste weight and evidence, then completes the order.
+- **Collection staff**: receives one targeted nearby order at a time, accepts or rejects it, travels to the pickup point, records actual waste weight and evidence, then completes the order.
 - **Admin/CSKH**: monitors operations, manages catalogue/price/package/account/complaint data, and intervenes only for exceptions or overrides.
 
 The application is mobile-first. Admin screens are currently mobile-responsive Flutter screens; a separate desktop web experience is a later scope, not a reason to introduce a different visual language.
@@ -21,29 +21,31 @@ The visible app is a functional UI prototype with in-memory Riverpod state.
 - Login is a demo role/session switch, not Firebase Authentication.
 - Creating, accepting, rejecting, cancelling, and updating an order affects the current app session only.
 - A hot restart resets all data to seed values.
-- `main.dart` initializes Firebase, and a Spark-compatible open-order adapter
-  exists, but the visible UI still uses the mock providers.
+- `main.dart` initializes Firebase, and the customer/staff order flow uses the
+  Firestore workflow adapter when Firebase Auth is active. Mock providers remain
+  the widget-test/offline fallback.
 
 Never claim that a screen is persisted or realtime until that screen has been
 switched to the production providers and verified with Firebase Auth.
 
 ## 3. Agreed Core Order Flow
 
-The course-project flow uses a shared open-order queue, similar to a delivery
-app. It does not require admin assignment or Cloud Functions.
+The course-project flow uses sequential targeted dispatch, similar to a
+delivery app. It does not require admin assignment or Cloud Functions.
 
 ```text
 Customer submits a pickup order
   -> order is CHO_XU_LY
-  -> all available staff can see the order
-  -> first atomic claim: DA_NHAN; that staff becomes nhanVienHienTaiId
-  -> dismiss: record the reason and hide it only for that staff member
-  -> nobody claims yet: keep CHO_XU_LY
+  -> rank ready staff by GPS distance
+  -> only nhanVienDeXuatId can see and respond to the offer
+  -> accept: DA_NHAN; that staff becomes nhanVienHienTaiId and busy
+  -> reject: record the reason and target the next nearest staff member
+  -> no candidate: keep CHO_XU_LY with dangChoHoTro = true
 ```
 
-The current mock and Firestore adapter both use this open queue. Client
-validation checks readiness, work time, schedule conflicts, and ETA. The
-Firestore transaction prevents two staff members from accepting one order.
+The current mock and Firestore adapter both use this targeted flow. Candidate
+ranking falls back to district, current revenue, then staff ID when GPS is
+missing. Firestore transactions recheck the offer owner and staff availability.
 
 Admin manual assignment is an exception/override. It may create a `CHO_NHAN` waiting state for the selected staff member, but it is not the normal path.
 
@@ -188,13 +190,17 @@ contract; never reintroduce the old lower_snake_case names.
 - One payment stores `GOI_THANG` in `phuongThuc`, although it is a fee type rather than a payment method.
 - Some audited Vietnamese text may be encoding-damaged. Treat it as display data; do not invent enum values from it.
 
-### Open-queue persistence
+### Targeted-offer persistence
 
-Open orders are read from `DON_THU_GOM` with `trangThai = CHO_XU_LY`.
-`nhanVienTuChoiIds` stores staff who dismissed an order. A claim creates
+Offers are read from `DON_THU_GOM` with
+`nhanVienDeXuatId == signed-in staff UID`; Rules prevent reading another
+staff member's offer. `nhanVienTuChoiIds` stores rejected staff and
+`offerExpiresAt` stores the current offer deadline. An acceptance creates
 `PHAN_CONG_THU_GOM.DA_NHAN` and sets `nhanVienHienTaiId` plus
-`phanCongHienTaiId` in one transaction. A dismissal creates
-`PHAN_CONG_THU_GOM.TU_CHOI`.
+`phanCongHienTaiId` in one transaction. The same transaction changes
+`NHAN_VIEN_THU_GOM.trangThaiLamViec` to `DANG_THU_GOM`, preventing a second
+unfinished order from being claimed by that staff member. A dismissal creates
+`PHAN_CONG_THU_GOM.TU_CHOI` and moves `nhanVienDeXuatId` to the next candidate.
 
 The selected classroom backend uses Spark-compatible client transactions.
 Blaze and Cloud Functions are not required.
@@ -206,30 +212,30 @@ Existing assignment data must be migrated before live activation. Read
 
 Every UI task must first read `AGENTS.md` and the design documents listed in section 4.
 
-### Official palette
+### V3 Calm Utility palette
 
-| Token | Hex | Use |
-|---|---|---|
-| `green` / primary | `#10B981` | header, primary CTA, active/positive state |
-| `blue` / secondary | `#2563EB` | active pickup or secondary operational status |
-| `amber` / accent | `#F59E0B` | pending/attention chips and compact accents |
-| `purple` / support | `#8B5CF6` | support, QR, notification utility accents |
-| `slate` / text | `#1F2937` | primary text and neutral icons |
-| `gray` / background | `#F3F4F6` | screen background, subtle surfaces/dividers |
-| `white` / surface | `#FFFFFF` | cards, forms, modal surfaces |
+Use the complete token table in `docs/design-tokens.md`. Core roles are
+green600 `#285F46` for primary actions, green900 `#102F25` for operational
+heroes, `#F4F6F4` for the page background, white for surfaces, `#D9DFDA` for
+borders, and `#16221C` / `#536159` / `#7A867F` for the three text levels.
 
-Muted text, borders, and soft backgrounds must be opacity variants of the official palette. Google/Facebook logo colors are allowed only inside their provider icons.
+Semantic states are pending yellow, processing blue, success green and danger
+red. Google/Facebook colors are allowed only inside provider marks.
 
 ### Layout and component rules
 
-- Mobile-first, compact, white/gray card system, light borders, minimal/no shadows.
-- App screens use the green header pattern from Customer Home: wordmark centered, menu left, notification right where relevant.
-- Auth screens use no AppBar, a centered real logo mark, slogan below, compact 8px-style fields, and a green full-width CTA.
-- Use only the existing compact typography scale: screen title 18, section title 14, label 12, input/button 13, body 12, caption 11, tiny 10.
+- Mobile-first, neutral-canvas/white-surface system with quiet borders.
+- App screens use the compact white product header from Customer Home.
+- Auth screens use no AppBar, the approved centered logo-and-form composition,
+  a direct form surface and 12px-radius fields.
+- Use the V3 typography scale from `docs/design-tokens.md`.
 - Use `AppSpacing`, `AppRadius`, and `AppSizes` from `lib/core/theme/app_theme.dart`; do not hardcode a new spacing/radius/size system.
-- Inputs and primary buttons are 46px high; social buttons are 44px; cards use roughly 10px radius; promo cards use 12px radius.
-- Cards are white on `#F3F4F6`; primary actions are green; pending is amber; active travel is blue; complete is green; utility is purple; cancelled is slate/gray.
-- Do not introduce a new palette, typography scale, header style, button/input style, large hero layout, heavy shadows, glassmorphism, neumorphism, decorative illustrations, or bright gradients.
+- Inputs/buttons are 50px, social buttons 48px, cards 16px radius and modal
+  surfaces 22px.
+- Gradients are reserved for heroes. AppBars and primary CTAs are solid.
+- Sunflower yellow is limited to small attention elements and must not fill cards,
+  AppBars, page backgrounds or primary buttons.
+- Do not introduce colors or visual styles outside the V3 design system.
 
 ### Shared-widget priority
 
@@ -238,6 +244,8 @@ Reuse or extend these before creating a one-off component:
 - `AppPage`, `BrandLogo`, `BrandWordmark`, `HomeBrandHeader`
 - `AppTextInput`, `PrimaryActionButton`, `SocialAuthButton`, `AppSearchBar`
 - `SectionHeader`, `MetricCard`, `OrderCard`, `StatusChip`, `OrderTimeline`, `EmptyState`
+- `AppLoadingView`, `AppErrorState`, `AnimatedEntrance`, `DashboardHero`,
+  `DashboardMetricCard`, `AnimatedProgressBar`, `OrderJourneyBar`
 
 The customer home screen is the visual baseline for customer, staff, and admin screens. Do not make admin screens look like a separate desktop dashboard product.
 
@@ -259,13 +267,14 @@ Implemented at UI/mock-flow level:
 
 - Login, sign-up, forgot-password, verify-OTP screens.
 - Customer home, booking, order detail/tracking, cancellation action, package summary, order list, and notification cards.
-- Staff home with an open-order queue, claim/dismiss, accepted jobs, and order status handling.
+- Staff home with targeted offers, accept/reject, busy-state offer hiding,
+  accepted jobs, and order status handling.
 - Admin dashboard and manual exception assignment.
 
 Implemented as backend code but not yet connected to the visible screens:
 
 - Firestore reads/writes, realtime listeners, atomic workflow transactions,
-  uppercase security rules, indexes, and open-queue persistence.
+  uppercase security rules, indexes, and targeted-offer persistence.
 
 Not yet completed as live end-to-end features:
 

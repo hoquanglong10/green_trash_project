@@ -10,6 +10,7 @@ void main() {
     test('maps backend order fields and denormalized matching state', () {
       final createdAt = DateTime(2026, 7, 27, 9);
       final pickupAt = DateTime(2026, 7, 30, 8);
+      final offerExpiresAt = DateTime(2026, 7, 27, 9, 2);
 
       final order = FirestoreOrderMapper.fromMap(
         documentId: 'DON_TEST',
@@ -19,6 +20,8 @@ void main() {
           'diaChiId': 'DC_TEST',
           'loaiRacId': 'LR_TEST',
           'phanCongHienTaiId': 'PC_TEST',
+          'nhanVienDeXuatId': 'STAFF_NEXT',
+          'offerExpiresAt': Timestamp.fromDate(offerExpiresAt),
           'nhanVienTuChoiIds': ['STAFF_OLD'],
           'soLanDeXuat': 2,
           'dangChoHoTro': true,
@@ -36,11 +39,12 @@ void main() {
       expect(order.phanCongHienTaiId, 'PC_TEST');
       expect(order.offerAttempt, 2);
       expect(order.waitingForSupport, isTrue);
-      expect(order.nhanVienDeXuatId, isNull);
+      expect(order.nhanVienDeXuatId, 'STAFF_NEXT');
+      expect(order.offerExpiresAt, offerExpiresAt);
       expect(order.nhanVienTuChoiIds, ['STAFF_OLD']);
     });
 
-    test('create data initializes the classroom rejection list', () {
+    test('create data enters support queue when no staff is available', () {
       final now = DateTime(2026, 7, 27, 9);
       final data = FirestoreOrderMapper.createData(
         maDon: 'DON_TEST',
@@ -58,10 +62,35 @@ void main() {
 
       expect(data['trangThai'], 'CHO_XU_LY');
       expect(data['soLanDeXuat'], 0);
-      expect(data['dangChoHoTro'], isFalse);
+      expect(data['dangChoHoTro'], isTrue);
       expect(data, isNot(contains('nhanVienDeXuatId')));
       expect(data['nhanVienTuChoiIds'], isEmpty);
       expect(data, isNot(contains('offerExpiresAt')));
+    });
+
+    test('create data stores one targeted staff offer', () {
+      final now = DateTime(2026, 7, 27, 9);
+      final expiresAt = now.add(const Duration(minutes: 2));
+      final data = FirestoreOrderMapper.createData(
+        maDon: 'DON_TARGETED',
+        command: CreatePickupOrderCommand(
+          khachHangId: 'CUSTOMER_UID',
+          diaChiId: 'DC_TEST',
+          loaiRacId: 'LR_TEST',
+          khoiLuongDuKien: 5,
+          ngayThuGom: DateTime(2026, 7, 30),
+          khungGio: '08:00-10:00',
+          hinhThucTinhPhi: 'THEO_KG',
+        ),
+        now: now,
+        suggestedStaffId: 'STAFF_NEAREST',
+        offerExpiresAt: expiresAt,
+      );
+
+      expect(data['nhanVienDeXuatId'], 'STAFF_NEAREST');
+      expect(data['soLanDeXuat'], 1);
+      expect(data['dangChoHoTro'], isFalse);
+      expect((data['offerExpiresAt'] as Timestamp).toDate(), expiresAt);
     });
   });
 

@@ -1,52 +1,39 @@
-# UI Audit Checklist
+# GreenTrash V3 UI Audit Checklist
 
-Before finishing any UI task, verify:
+## Sources
 
-## Design source check
-- [ ] Read `AGENTS.md`
-- [ ] Read `docs/ui-style-guide.md`
-- [ ] Read `docs/design-tokens.md`
-- [ ] Read `docs/ui-guardrails.md`
-- [ ] Read the relevant screen spec
-- [ ] Checked `docs/references/auth-home-reference.png`
+- [ ] Read `AGENTS.md` and V3 design documents
+- [ ] Read the relevant screen and workflow specification
+- [ ] Inspect shared theme and widgets before adding UI
 
-## Token usage
-- [ ] Colors use `AppColors`
-- [ ] Spacing uses `AppSpacing` or repeated approved values
-- [ ] Radius uses `AppRadius`
-- [ ] Sizes use `AppSizes`
-- [ ] Typography is compact and theme-driven
-- [ ] No old `#22AA86`, `#9CC026`, `#44514E`, or `#F2F4F4` brand colors remain
+## UX
 
-## Component reuse
-- [ ] `AppPage` reused for app screens
-- [ ] Shared input/button/card/list widgets reused where applicable
-- [ ] No duplicate one-off component styles
-- [ ] New shared component added only when reusable
+- [ ] Screen state is clear in the first viewport
+- [ ] The next primary action is obvious
+- [ ] Secondary data does not compete with the primary task
+- [ ] Loading, empty, error, disabled and success states are explicit
+- [ ] Destructive actions require appropriate confirmation
 
-## Visual consistency
-- [ ] Main screen green header matches Customer Home reference style
-- [ ] Auth screens use the no-AppBar centered-logo variant
-- [ ] Buttons match reference style
-- [ ] Inputs match reference style
-- [ ] Cards match reference style
-- [ ] Typography remains compact
-- [ ] Page background uses light gray and cards/forms use white
-- [ ] No unrelated visual language introduced
-- [ ] List screens use the responsive 900px shell, adaptive horizontal padding,
-      full-width list cards, and a web-only native scrollbar.
+## Visual system
 
-## Scope control
-- [ ] No unrelated files changed
-- [ ] No business logic changed
-- [ ] No Riverpod provider changes unless requested
-- [ ] No Firestore schema changes unless requested
+- [ ] White app header and neutral canvas are used consistently
+- [ ] Green hero is limited to brand or operational state
+- [ ] Surfaces use quiet borders and no default elevation
+- [ ] Semantic colors include an icon and text label
+- [ ] No nested cards, decorative icon-tile repetition or large accent fills
+- [ ] Typography, spacing, radius and motion use V3 tokens
 
-## Final summary
-Include:
+## Responsive and accessibility
 
-- files changed
-- components reused
-- tokens used
-- assumptions made
-- checks run
+- [ ] No overflow at 360px
+- [ ] Lists fill the responsive 760/900px shell
+- [ ] Web-only scrollbar behavior is preserved
+- [ ] Touch targets are at least 44px
+- [ ] Reduced motion is honored
+
+## Verification
+
+- [ ] Riverpod/Firebase/business behavior is unchanged for UI work
+- [ ] `flutter analyze` passes
+- [ ] Relevant widget and responsive tests pass
+- [ ] Customer, staff, admin and auth previews were reviewed

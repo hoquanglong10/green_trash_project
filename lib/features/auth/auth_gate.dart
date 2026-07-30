@@ -55,7 +55,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     final session = ref.watch(currentSessionProvider);
     final firebaseEnabled = ref.watch(firebaseEnabledProvider);
     if (_restoring && firebaseEnabled) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: AppLoadingView(message: 'Đang xác thực...'));
     }
     if (session == null) return LoginScreen(initialMessage: _restoreError);
 
@@ -119,7 +119,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       panel: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(child: BrandLogo(stacked: true, logoSize: 200)),
+          Text(
+            'Chào mừng trở lại',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Đăng nhập để tiếp tục quản lý hoạt động thu gom.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
           const SizedBox(height: AppSpacing.xxl),
           if (widget.initialMessage != null) ...[
             Text(
@@ -148,31 +158,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: Checkbox(
-                  value: _rememberMe,
-                  activeColor: AuthRefColors.controlIcon,
-                  checkColor: AppColors.surface,
-                  onChanged: (value) =>
-                      setState(() => _rememberMe = value ?? false),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              Expanded(
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: Checkbox(
+                        value: _rememberMe,
+                        activeColor: AuthRefColors.controlIcon,
+                        checkColor: AppColors.surface,
+                        onChanged: (value) =>
+                            setState(() => _rememberMe = value ?? false),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Flexible(
+                      child: Text(
+                        'Ghi nhớ tôi',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AuthRefColors.controlText,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Ghi nhớ tôi',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AuthRefColors.controlText,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
               TextButton(
                 style: TextButton.styleFrom(
                   foregroundColor: AuthRefColors.controlText,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs,
+                  ),
                 ),
                 onPressed: () {
                   Navigator.of(context).push(
@@ -225,8 +247,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             onPressed: () {},
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
                 'Chưa có tài khoản?',
@@ -591,24 +614,24 @@ class AuthScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.screenBackground,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.authScreenHorizontal,
-                AppSpacing.xxl,
-                AppSpacing.authScreenHorizontal,
-                AppSpacing.xxl,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xxl,
+                vertical: AppSpacing.xxxl,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (showBack) ...[
-                    _AuthBackHeader(title: title, subtitle: subtitle),
-                    const SizedBox(height: AppSpacing.xxl),
-                  ],
+                  if (showBack)
+                    _AuthBackHeader(title: title, subtitle: subtitle)
+                  else
+                    const Center(child: BrandLogo(stacked: true, logoSize: 96)),
+                  SizedBox(height: showBack ? AppSpacing.xxl : AppSpacing.xxxl),
                   panel,
                 ],
               ),

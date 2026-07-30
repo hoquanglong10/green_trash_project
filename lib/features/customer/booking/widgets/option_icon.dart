@@ -11,19 +11,16 @@ class OptionIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 38,
-      height: 38,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
-        color: selected ? AppColors.primary : AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: selected ? AppColors.primary : AppColors.border,
-        ),
+        color: selected ? AppColors.green100 : AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Icon(
         icon,
-        size: 20,
-        color: selected ? AppColors.textInverse : AppColors.primaryDark,
+        size: 19,
+        color: selected ? AppColors.primary : AppColors.textMuted,
       ),
     );
   }

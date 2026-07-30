@@ -14,9 +14,10 @@ For data, business-flow, or Firebase work, read these before editing:
 4. `docs/screens/order-flow.md`
 5. `docs/backend-order-workflow.md`
 
-The audited uppercase Firestore schema is authoritative. The visible app flow
-is still mocked; the Spark-compatible open-order adapter exists but must not be
-described as live until Auth/provider activation and deployment are verified.
+The audited uppercase Firestore schema is authoritative. The customer/staff
+order flow uses the targeted Firestore adapter when Firebase Auth is active;
+mock state remains the offline/widget-test fallback. Do not describe a live
+change as deployed until Rules and provider activation are verified.
 
 ## Default prompt for UI work
 

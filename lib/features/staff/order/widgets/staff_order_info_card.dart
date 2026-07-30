@@ -22,7 +22,12 @@ class StaffOrderInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentAddress = address;
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
@@ -30,18 +35,10 @@ class StaffOrderInfoCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: const Icon(
-                    Icons.recycling,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
+                const Icon(
+                  Icons.recycling_rounded,
+                  color: AppColors.primary,
+                  size: 24,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -69,6 +66,7 @@ class StaffOrderInfoCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
+            const Divider(),
             _InfoLine(
               icon: Icons.person_outline,
               label: 'Khách',

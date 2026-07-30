@@ -297,7 +297,7 @@ class _CollectionConfirmationSheetState
                   Text(
                     _validationMessage,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.accent,
+                      color: AppColors.accentForeground,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

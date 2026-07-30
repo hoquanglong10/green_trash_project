@@ -13,15 +13,13 @@ File nay tong hop yeu cau nghiep vu tu docx/PDF goc. Khi co mau thuan giua tai l
 3. `docs/design-tokens.md`, `docs/ui-style-guide.md`, va `AGENTS.md` cho UI.
 4. Docx/PDF goc cho quy dinh nghiep vu con lai.
 
-Trang thai hien tai cua repo: UI van dung mock state va se reset khi hot
-restart. Firebase da duoc khoi tao; repository Firestore, transaction, Rules,
-va indexes cho hang cho don mo da co trong source nhung chua duoc noi vao man
-hinh vi Auth van la demo.
+Trang thai hien tai cua repo: Firebase Auth va repository Firestore duoc dung
+cho flow don khi dang nhap that; mock state chi la fallback cho test/offline.
 
-Quyet dinh flow chinh cho do an: khach dat don -> don vao hang cho mo -> cac
-nhan vien dang san sang cung xem -> nguoi nhan transaction dau tien phu trach.
-Nhan vien co the bo qua de an don khoi danh sach cua minh. Admin chi can thiep
-khi can dieu phoi lai hoac co su co.
+Quyet dinh flow chinh cho do an: khach dat don -> app xep hang nhan vien san
+sang theo GPS -> chi gui cho mot nhan vien -> tu choi thi chuyen cho ung vien
+gan ke tiep -> nhan thi khoa nhan vien den khi don ket thuc. Admin chi can
+thiep khi khong con ung vien hoac co su co.
 
 ## 1. Tong Quan
 
@@ -57,7 +55,7 @@ Khach hang:
 
 Nhan vien thu gom:
 
-- Dang nhap, xem hang cho don moi va don da nhan.
+- Dang nhap, xem de xuat don danh rieng va don da nhan.
 - Nhan/bo qua don.
 - Chot gio den du kien.
 - Cap nhat trang thai di chuyen/tien trinh.
@@ -193,21 +191,24 @@ BM03 - Phieu doi diem/nhan qua trong tai lieu, nhung noi dung thuc te gan voi go
 
 ## 6. Luong Chinh
 
-Dat lich thu gom va dua vao hang cho:
+Dat lich thu gom va dieu phoi:
 
 1. Khach hang chon dich vu/bang gia, dia chi, loai rac, khoi luong du kien, ngay, khung gio, goi thang hoac tra theo kg.
 2. He thong kiem tra dang nhap, thong tin bat buoc, loai rac, goi/thanh toan, gio lam viec va ca phu hop.
 3. He thong tao don, sinh ma don, luu lich su; don o `CHO_XU_LY`.
-4. Tat ca nhan vien dang san sang co the xem don trong hang cho.
-5. Neu chua ai nhan, don tiep tuc giu `CHO_XU_LY`; khach hang thay trang thai dang cho nhan.
+4. He thong xep hang nhan vien san sang theo GPS; neu thieu GPS thi fallback
+   theo khu vuc, doanh thu hien tai, va ID.
+5. Chi nhan vien trong `nhanVienDeXuatId` duoc xem de xuat. Neu khong co ung
+   vien, don giu `CHO_XU_LY` va bat `dangChoHoTro`.
 
-Nhan hoac bo qua don thu gom:
+Nhan hoac tu choi don thu gom:
 
-1. Nhan vien xem danh sach cac don `CHO_XU_LY` chua bo qua.
+1. Nhan vien chi xem don `CHO_XU_LY` dang duoc de xuat cho UID cua minh.
 2. App kiem tra nhan vien dang san sang, khung gio phu hop, va don chua bi huy/da nhan.
-3. Nhan vien bam Nhan don hoac Bo qua; bo qua phai co ly do.
-4. Neu nhan: he thong gan `nhanVienHienTaiId`, chuyen don sang `DA_NHAN`, luu lich su, va thong bao khach hang. Nhan vien co the chot gio den du kien trong khung gio khach chon.
-5. Neu bo qua: he thong luu audit va an don voi nhan vien do; nhan vien khac van thay. Neu hai nguoi cung bam nhan, transaction chi cho mot nguoi thanh cong.
+3. Nhan vien bam Nhan don hoac Tu choi; tu choi phai co ly do.
+4. Neu nhan: he thong gan `nhanVienHienTaiId`, chuyen don sang `DA_NHAN`, chuyen nhan vien sang `DANG_THU_GOM`, luu lich su, va thong bao khach hang. Nhan vien khong nhan don khac cho den khi don hien tai hoan thanh hoac bi huy. Nhan vien co the chot gio den du kien trong khung gio khach chon.
+5. Neu tu choi: he thong luu audit, them UID vao `nhanVienTuChoiIds`, va gui
+   don cho ung vien gan ke tiep. Nhan vien dang co don khong thay hop de xuat moi.
 
 Cap nhat tien trinh:
 
@@ -322,9 +323,10 @@ Field cot loi:
 - AggregateStat: thongKeId, ngayThongKe, khuVuc, loaiRacId, tongSoDon, tongKg, tongDoanhThu, soKhieuNai.
 - SystemParameter: thamSoId, maThamSo, giaTri, moTa, ngayHieuLuc, trangThai.
 
-Open-queue persistence da chot: `nhanVienTuChoiIds` duoc ghi vao don de an don
-voi nhan vien da bo qua; `nhanVienDeXuatId` va `offerExpiresAt` van chi la
-field mock legacy. Nhan/bo qua duoc audit trong `PHAN_CONG_THU_GOM` voi
+Targeted-dispatch persistence da chot: `nhanVienDeXuatId` la nhan vien duy
+nhat duoc xem de xuat hien tai; `offerExpiresAt` luu han de xuat;
+`nhanVienTuChoiIds` loai cac nhan vien da tu choi khoi lan xep hang sau.
+Nhan/tu choi duoc audit trong `PHAN_CONG_THU_GOM` voi
 `nguonPhanCong = HE_THONG`. Chi tiet nam trong
 `docs/backend-order-workflow.md`.
 
@@ -385,10 +387,16 @@ Tieu chuan UI:
 - Man hinh tra cuu dung danh sach + bo loc: ma don, khach hang, ngay, trang thai.
 - Bao cao web theo luoi 12 cot, co bieu do, the so lieu, bang chi tiet, bo loc thoi gian.
 - Font Roboto/SF Pro.
-- Mau chinh theo Home reference: Green #10B981, Blue #2563EB, Amber #F59E0B, Purple #8B5CF6, Slate #1F2937, Gray #F3F4F6, White #FFFFFF.
-- Green dung cho header, nut chinh, icon/trang thai tich cuc, vien card dang chon; Blue dung cho trang thai dang xu ly/dang thu gom; Amber dung cho cho xu ly/canh bao nhe; Purple dung cho ho tro/tien ich phu; Slate la mau chu/icon trung tinh; Gray la nen tong the; White la card/form/content.
-- Input cao 44-48px, bo goc 8px.
-- Button chinh cao 44-48px, nen xanh, chu trang.
+- GreenTrash V3 dung thang mau xanh #F0F5F2 den #091E18. Primary la
+  #285F46, header ung dung la mau trang, hero van hanh la #102F25, nen la
+  #F4F6F4, surface la #FFFFFF, vien la #D9DFDA va ba cap chu la
+  #16221C / #536159 / #7A867F.
+- Trang thai cho dung vang, dang xu ly dung xanh lam, hoan thanh dung xanh la
+  va huy/loi dung do. Vang chi dung cho pending, warning, notification dot va
+  diem premium hiem. Moi trang thai phai co icon va nhan, khong phan biet chi
+  bang mau.
+- Input cao 50px, bo goc 12px.
+- Button chinh cao 50px, nen #285F46, chu trang, khong gradient.
 - Badge trang thai co mau rieng cho Cho/Dang xu ly/Hoan thanh/Huy.
 
 ## 11. Wireframe Trong Tai Lieu
@@ -403,7 +411,8 @@ Khach hang wireframe:
 
 Nhan vien wireframe:
 
-- Trang chu: ca lam viec 06:00-17:00, hang cho don moi, nut nhan/bo qua, don da nhan hom nay.
+- Trang chu: ca lam viec 06:00-17:00, de xuat don danh rieng, nut nhan/tu choi,
+  don da nhan hom nay; an de xuat moi khi dang co don.
 - Chi tiet don: ma don, thong tin khach, dia chi, loai rac, kg du kien, khung gio, chot gio, cap nhat trang thai, ban do/goi khach, huy don va nhap ly do.
 - Cap nhat tien trinh: chon trang thai don, vi tri gan nhat/GPS, luu trang thai va thong bao khach hang.
 - Xac nhan thu gom: loai rac thuc te, kg thuc te, khung chup/upload anh, tu dong tinh phi, ghi nhan thu tien tai cho, hoan thanh don.

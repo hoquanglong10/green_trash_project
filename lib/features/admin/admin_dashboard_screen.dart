@@ -6,8 +6,11 @@ import '../../core/utils/formatters.dart';
 import '../../models/app_models.dart';
 import '../../providers/app_providers.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/dashboard_shell.dart';
 import '../customer/order_detail_screen.dart';
 import 'admin_assignment_screen.dart';
+
+void _noop() {}
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -16,7 +19,9 @@ class AdminDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     if (user == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: AppLoadingView(message: 'Đang tải bảng điều phối...'),
+      );
     }
     final orders = ref.watch(adminOrdersProvider);
     final addresses = ref.watch(allAddressesProvider);
@@ -33,10 +38,41 @@ class AdminDashboardScreen extends ConsumerWidget {
       (sum, order) => sum + order.khoiLuongDuKien,
     );
 
-    return AppPage(
-      title: 'Điều phối GreenTrash',
-      subtitle: '${user.hoTen} • ADMIN',
+    void openAssignments() {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AdminAssignmentScreen()),
+      );
+    }
+
+    return DashboardShell(
+      maxContentWidth: 1120,
+      selectedIndex: 0,
+      destinations: [
+        const DashboardDestination(
+          icon: Icons.space_dashboard_outlined,
+          selectedIcon: Icons.space_dashboard_rounded,
+          label: 'Tổng quan',
+          onSelected: _noop,
+        ),
+        DashboardDestination(
+          icon: Icons.rule_folder_outlined,
+          selectedIcon: Icons.rule_folder_rounded,
+          label: 'Ngoại lệ',
+          onSelected: openAssignments,
+        ),
+      ],
       actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: AppSpacing.sm),
+          child: Center(
+            child: Text(
+              user.hoTen,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+        ),
         IconButton(
           tooltip: 'Đăng xuất',
           onPressed: () async {
@@ -55,18 +91,18 @@ class AdminDashboardScreen extends ConsumerWidget {
         ),
         children: [
           HomeBrandHeader(
-            title: 'Bảng điều phối hôm nay',
-            subtitle: 'Theo dõi đơn, nhân viên và phân công thu gom.',
+            title: 'Tổng quan vận hành',
+            subtitle:
+                'Theo dõi khối lượng công việc và các trường hợp cần xử lý.',
             trailing: Container(
               width: 42,
               height: 42,
               decoration: BoxDecoration(
                 color: AppColors.opacity(AppColors.white, 0.14),
                 borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.accent),
               ),
               child: const Icon(
-                Icons.dashboard_outlined,
+                Icons.monitor_heart_outlined,
                 color: AppColors.textInverse,
               ),
             ),
@@ -116,15 +152,9 @@ class AdminDashboardScreen extends ConsumerWidget {
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AdminAssignmentScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.assignment_ind_outlined),
-                  label: const Text('Phân công đơn'),
+                  onPressed: openAssignments,
+                  icon: const Icon(Icons.rule_folder_outlined),
+                  label: const Text('Xử lý ngoại lệ phân công'),
                 ),
               ),
             ],
@@ -160,23 +190,9 @@ class AdminDashboardScreen extends ConsumerWidget {
           const SectionHeader(title: 'Nhân viên đang sẵn sàng'),
           const SizedBox(height: AppSpacing.sm),
           ...staff.map(
-            (profile) => Card(
-              child: ListTile(
-                leading: const Icon(Icons.badge_outlined),
-                title: Text(profile.maNhanVien),
-                subtitle: Text(
-                  '${profile.gioBatDau}-${profile.gioKetThuc} • ${profile.viTriHienTai}',
-                ),
-                trailing: Text(
-                  profile.trangThaiLamViec == 'SAN_SANG'
-                      ? 'Sẵn sàng'
-                      : profile.trangThaiLamViec,
-                  style: const TextStyle(
-                    color: AppColors.success,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
+            (profile) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _StaffAvailabilityRow(profile: profile),
             ),
           ),
         ],
@@ -196,5 +212,64 @@ class AdminDashboardScreen extends ConsumerWidget {
       if (waste.loaiRacId == id) return waste;
     }
     return null;
+  }
+}
+
+class _StaffAvailabilityRow extends StatelessWidget {
+  const _StaffAvailabilityRow({required this.profile});
+
+  final StaffProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final available = profile.trangThaiLamViec == 'SAN_SANG';
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            available ? Icons.radio_button_checked : Icons.schedule_rounded,
+            color: available ? AppColors.success : AppColors.textMuted,
+            size: 18,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  profile.maNhanVien,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  '${profile.gioBatDau}-${profile.gioKetThuc} • ${profile.viTriHienTai}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            available ? 'Sẵn sàng' : 'Bận',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: available ? AppColors.success : AppColors.textMuted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -9,10 +9,11 @@ import '../../orders/domain/order_workflow_models.dart';
 import '../../../models/app_models.dart';
 import '../../../providers/app_providers.dart';
 import '../../../shared/widgets/app_widgets.dart';
+import '../address_book/presentation/address_book_screen.dart';
+import '../address_book/presentation/address_form_screen.dart';
 import '../order_detail_screen.dart';
 import 'booking_calculator.dart';
 import 'widgets/address_option_card.dart';
-import 'widgets/booking_submit_panel.dart';
 import 'widgets/order_preview_card.dart';
 import 'widgets/payment_method_card.dart';
 import 'widgets/schedule_card.dart';
@@ -33,6 +34,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   String? _khungGio;
   String _hinhThucTinhPhi = 'GOI_THANG';
   late DateTime _ngayThuGom;
+  int _step = 0;
 
   @override
   void initState() {
@@ -61,7 +63,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     if (user == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: AppLoadingView(message: 'Đang chuẩn bị biểu mẫu...'),
+      );
     }
 
     final addresses = ref.watch(customerAddressesProvider);
@@ -118,47 +122,44 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       now: now,
     );
 
-    return AppPage(
-      maxWidth: 760,
-      title: 'Đặt lịch thu gom',
-      subtitle: 'Gửi đơn đến nhân viên đang sẵn sàng',
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.screenHorizontal,
-          AppSpacing.md,
-          AppSpacing.screenHorizontal,
-          AppSpacing.xxl,
-        ),
+    final stepCanContinue = switch (_step) {
+      0 => selectedAddress?.hasPickupCoordinate == true,
+      1 => selectedWaste != null,
+      2 => kg != null && selectedSlot != null,
+      _ => validation.canSubmit,
+    };
+
+    final stepBody = switch (_step) {
+      0 => ListView(
+        key: const ValueKey('booking-address-step'),
+        padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
         children: [
-          HomeBrandHeader(
-            title: 'Lập đơn thu gom mới',
-            subtitle:
-                'Chọn thông tin thu gom, đơn sẽ xuất hiện trong danh sách chờ nhận của nhân viên.',
-            trailing: Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: AppColors.opacity(AppColors.white, 0.14),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.accent),
-              ),
-              child: const Icon(
-                Icons.add_location_alt_outlined,
-                color: AppColors.textInverse,
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sectionGap),
-          const SectionHeader(
+          SectionHeader(
             title: 'Địa chỉ lấy rác',
-            subtitle: 'Chọn nơi nhân viên sẽ đến',
+            subtitle: 'Nhân viên sẽ đến địa chỉ bạn chọn',
+            trailing: addresses.isEmpty
+                ? null
+                : TextButton(
+                    onPressed: _openAddressBook,
+                    child: const Text('Quản lý'),
+                  ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
           if (addresses.isEmpty)
-            const EmptyState(
-              icon: Icons.place_outlined,
-              title: 'Chưa có địa chỉ',
-              message: 'Bạn cần thêm địa chỉ trước khi tạo đơn thu gom.',
+            Column(
+              children: [
+                const EmptyState(
+                  icon: Icons.place_outlined,
+                  title: 'Chưa có địa chỉ',
+                  message: 'Thêm địa chỉ đầu tiên để tạo đơn thu gom.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                PrimaryActionButton(
+                  label: 'Thêm địa chỉ',
+                  icon: Icons.add_location_alt_outlined,
+                  onPressed: _addAddress,
+                ),
+              ],
             )
           else
             ...addresses.map(
@@ -171,22 +172,27 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 ),
               ),
             ),
-          const SizedBox(height: AppSpacing.sectionGap),
+        ],
+      ),
+      1 => ListView(
+        key: const ValueKey('booking-waste-step'),
+        padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
+        children: [
           const SectionHeader(
-            title: 'Loại rác',
-            subtitle: 'Chọn đúng nhóm rác để ước tính chi phí',
+            title: 'Bạn muốn thu gom gì?',
+            subtitle: 'Chọn một nhóm rác để hệ thống ước tính chi phí',
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
           LayoutBuilder(
             builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 680 ? 3 : 1;
+              final columns = constraints.maxWidth >= 620 ? 3 : 1;
               return GridView.count(
                 crossAxisCount: columns,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: AppSpacing.sm,
                 mainAxisSpacing: AppSpacing.sm,
-                childAspectRatio: columns == 1 ? 3.45 : 1.28,
+                childAspectRatio: columns == 1 ? 3.25 : 1.24,
                 children: [
                   for (final waste in wastes)
                     WasteOptionCard(
@@ -199,12 +205,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               );
             },
           ),
-          const SizedBox(height: AppSpacing.sectionGap),
+        ],
+      ),
+      2 => ListView(
+        key: const ValueKey('booking-schedule-step'),
+        padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
+        children: [
           const SectionHeader(
-            title: 'Thời gian và khối lượng',
-            subtitle: 'Chọn khung giờ khách có thể bàn giao rác',
+            title: 'Chọn lịch và khối lượng',
+            subtitle: 'Đảm bảo bạn có mặt trong khung giờ đã chọn',
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
           ScheduleCard(
             ngayThuGom: _ngayThuGom,
             khungGio: selectedSlot,
@@ -213,12 +224,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             onPickDate: _pickDate,
             onSelectSlot: (slot) => setState(() => _khungGio = slot),
           ),
-          const SizedBox(height: AppSpacing.sectionGap),
+          const SizedBox(height: AppSpacing.xl),
           const SectionHeader(
             title: 'Cách tính phí',
-            subtitle: 'Gói tháng sẽ được ưu tiên nếu còn hạn mức',
+            subtitle: 'Gói tháng được ưu tiên khi còn hạn mức',
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
           _PaymentMethodSection(
             paymentMethod: _hinhThucTinhPhi,
             package: package,
@@ -227,7 +238,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             packageAvailable: hasActivePackage,
             onChanged: (value) => setState(() => _hinhThucTinhPhi = value),
           ),
-          const SizedBox(height: AppSpacing.sectionGap),
+          const SizedBox(height: AppSpacing.xl),
           TextField(
             controller: _noteController,
             minLines: 3,
@@ -239,7 +250,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               prefixIcon: Icon(Icons.notes_outlined),
             ),
           ),
-          const SizedBox(height: AppSpacing.sectionGap),
+          const SizedBox(height: AppSpacing.xxl),
+        ],
+      ),
+      _ => ListView(
+        key: const ValueKey('booking-review-step'),
+        padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
+        children: [
+          const SectionHeader(
+            title: 'Kiểm tra lại đơn',
+            subtitle: 'Xác nhận thông tin trước khi gửi đến nhân viên',
+          ),
+          const SizedBox(height: AppSpacing.md),
           OrderPreviewCard(
             address: selectedAddress,
             waste: selectedWaste,
@@ -250,20 +272,58 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             paymentMethod: paymentMethod,
             estimate: estimate,
           ),
-          const SizedBox(height: AppSpacing.md),
-          BookingSubmitPanel(
-            canSubmit: validation.canSubmit,
+          if (validation.message != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            _BookingWarning(message: validation.message!),
+          ],
+          const SizedBox(height: AppSpacing.xxl),
+        ],
+      ),
+    };
+
+    return AppPage(
+      maxWidth: 760,
+      title: 'Đặt lịch thu gom',
+      subtitle: 'Bước ${_step + 1} trên 4',
+      child: Column(
+        children: [
+          _BookingProgress(currentStep: _step),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: AppMotion.standard,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.035, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: stepBody,
+            ),
+          ),
+          _BookingWizardFooter(
+            currentStep: _step,
+            canContinue: stepCanContinue,
             estimate: estimate,
             staffLabel: suggestedStaff == null
                 ? 'Đơn sẽ vào hàng chờ hỗ trợ'
                 : 'Gửi đến ${suggestedStaff.maNhanVien}',
-            validationMessage: validation.message,
-            onSubmit: () => _createOrder(
-              user,
-              validation: validation,
-              paymentMethod: paymentMethod,
-              selectedSlot: selectedSlot,
-            ),
+            onBack: _step == 0 ? null : () => setState(() => _step--),
+            onContinue: () {
+              if (_step < 3) {
+                setState(() => _step++);
+                return;
+              }
+              _createOrder(
+                user,
+                validation: validation,
+                paymentMethod: paymentMethod,
+                selectedSlot: selectedSlot,
+              );
+            },
           ),
         ],
       ),
@@ -295,6 +355,29 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         _ngayThuGom = picked;
         _khungGio = availableSlots.isEmpty ? null : availableSlots.first;
       });
+    }
+  }
+
+  Future<void> _addAddress() async {
+    final addressId = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const AddressFormScreen()),
+    );
+    if (!mounted || addressId == null) return;
+    setState(() => _diaChiId = addressId);
+  }
+
+  Future<void> _openAddressBook() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AddressBookScreen()));
+    if (!mounted) return;
+    final addresses = ref.read(customerAddressesProvider);
+    if (addresses.isEmpty) return;
+    final selectedStillExists = addresses.any(
+      (address) => address.diaChiId == _diaChiId,
+    );
+    if (!selectedStillExists) {
+      setState(() => _diaChiId = addresses.first.diaChiId);
     }
   }
 
@@ -392,6 +475,224 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         'Khong ket noi duoc Firestore. Kiem tra mang roi thu lai.',
       _ => error.message ?? 'Firestore khong the tao don (${error.code}).',
     };
+  }
+}
+
+class _BookingProgress extends StatelessWidget {
+  const _BookingProgress({required this.currentStep});
+
+  final int currentStep;
+
+  @override
+  Widget build(BuildContext context) {
+    const steps = [
+      (Icons.location_on_outlined, 'Địa chỉ'),
+      (Icons.recycling_rounded, 'Loại rác'),
+      (Icons.event_outlined, 'Lịch hẹn'),
+      (Icons.task_alt_rounded, 'Xác nhận'),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          for (var index = 0; index < steps.length; index++) ...[
+            Expanded(
+              child: Column(
+                children: [
+                  AnimatedContainer(
+                    duration: AppMotion.fast,
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: index < currentStep
+                          ? AppColors.primary
+                          : index == currentStep
+                          ? AppColors.green100
+                          : AppColors.surfaceAlt,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      index < currentStep
+                          ? Icons.check_rounded
+                          : steps[index].$1,
+                      size: 17,
+                      color: index < currentStep
+                          ? AppColors.textInverse
+                          : index == currentStep
+                          ? AppColors.primary
+                          : AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    steps[index].$2,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: index == currentStep
+                          ? AppColors.primaryDark
+                          : AppColors.textMuted,
+                      fontWeight: index == currentStep
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (index < steps.length - 1)
+              Expanded(
+                child: Container(
+                  height: 2,
+                  margin: const EdgeInsets.only(bottom: 22),
+                  color: index < currentStep
+                      ? AppColors.primary
+                      : AppColors.border,
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BookingWizardFooter extends StatelessWidget {
+  const _BookingWizardFooter({
+    required this.currentStep,
+    required this.canContinue,
+    required this.estimate,
+    required this.staffLabel,
+    required this.onBack,
+    required this.onContinue,
+  });
+
+  final int currentStep;
+  final bool canContinue;
+  final String estimate;
+  final String staffLabel;
+  final VoidCallback? onBack;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (currentStep == 3) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          estimate,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          staffLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            Row(
+              children: [
+                if (onBack != null) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Quay lại'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                ],
+                Expanded(
+                  flex: onBack == null ? 1 : 2,
+                  child: FilledButton.icon(
+                    onPressed: canContinue ? onContinue : null,
+                    icon: Icon(
+                      currentStep == 3
+                          ? Icons.send_rounded
+                          : Icons.arrow_forward_rounded,
+                    ),
+                    label: Text(currentStep == 3 ? 'Gửi đơn' : 'Tiếp tục'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BookingWarning extends StatelessWidget {
+  const _BookingWarning({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.yellow50,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.yellow200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 19,
+            color: AppColors.warning,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.text),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

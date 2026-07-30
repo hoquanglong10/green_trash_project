@@ -28,9 +28,7 @@ class StaffOrderScreen extends ConsumerStatefulWidget {
 }
 
 class _StaffOrderScreenState extends ConsumerState<StaffOrderScreen> {
-  static const _locationTrackingStatuses = {
-    'DANG_DEN',
-  };
+  static const _locationTrackingStatuses = {'DANG_DEN'};
 
   String? _trackingStaffId;
   String? _trackingOrderId;
@@ -56,7 +54,10 @@ class _StaffOrderScreenState extends ConsumerState<StaffOrderScreen> {
     final order = findStaffOrder(orders, widget.maDon);
     if (order == null) {
       return const Scaffold(
-        body: Center(child: Text('Không tìm thấy đơn thu gom.')),
+        body: AppErrorState(
+          title: 'Không tìm thấy đơn',
+          message: 'Đơn có thể đã được nhân viên khác nhận hoặc đã thay đổi.',
+        ),
       );
     }
 

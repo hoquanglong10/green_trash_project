@@ -11,6 +11,7 @@ import '../../../shared/widgets/activity_log_card.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../../../shared/widgets/collection_record_card.dart';
 import '../../../shared/widgets/payment_summary_card.dart';
+import '../../../shared/widgets/home_dashboard_widgets.dart';
 import 'order_detail_lookup.dart';
 import 'widgets/detail_actions_card.dart';
 import 'widgets/detail_info_card.dart';
@@ -33,7 +34,10 @@ class OrderDetailScreen extends ConsumerWidget {
 
     if (order == null) {
       return const Scaffold(
-        body: Center(child: Text('Không tìm thấy đơn thu gom.')),
+        body: AppErrorState(
+          title: 'Không tìm thấy đơn',
+          message: 'Đơn thu gom có thể đã bị xóa hoặc bạn không có quyền xem.',
+        ),
       );
     }
 
@@ -67,18 +71,26 @@ class OrderDetailScreen extends ConsumerWidget {
           AppSpacing.xxl,
         ),
         children: [
-          TrackingHero(order: selectedOrder, staff: staffProfile),
+          AnimatedEntrance(
+            child: TrackingHero(order: selectedOrder, staff: staffProfile),
+          ),
           if (selectedOrder.trangThai == 'CHO_XU_LY' ||
               selectedOrder.trangThai == 'CHO_NHAN') ...[
             const SizedBox(height: AppSpacing.md),
-            StaffMatchingCard(staff: staffProfile),
+            AnimatedEntrance(
+              order: 1,
+              child: StaffMatchingCard(staff: staffProfile),
+            ),
           ],
           const SizedBox(height: AppSpacing.sectionGap),
-          DetailInfoCard(
-            order: selectedOrder,
-            address: address,
-            waste: waste,
-            staff: staffProfile,
+          AnimatedEntrance(
+            order: 2,
+            child: DetailInfoCard(
+              order: selectedOrder,
+              address: address,
+              waste: waste,
+              staff: staffProfile,
+            ),
           ),
           if (address != null &&
               {

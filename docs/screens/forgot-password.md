@@ -4,7 +4,9 @@
 Use `docs/references/auth-home-reference.png`.
 
 ## Target
-No green AppBar in the current requested variant. Use a compact inline back header, white/light content, short helper text, one email input, one green confirmation button.
+No AppBar. Use the centered V3 auth scaffold and direct form surface, with a
+compact inline back header, short helper text, one email input and one primary
+confirmation button.
 
 ## Rules
-Do not add illustration or decorative blocks. Keep compact spacing.
+Do not add stock illustration or decorative animation. Keep compact spacing.

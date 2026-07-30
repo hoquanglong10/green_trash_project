@@ -177,8 +177,8 @@
         "phuongXa": {"type": "string", "required": false},
         "quanHuyen": {"type": "string", "required": false},
         "tinhThanh": {"type": "string", "required": false},
-        "toaDoLat": {"type": "number", "required": false},
-        "toaDoLng": {"type": "number", "required": false},
+        "toaDoLat": {"type": "number", "required": true},
+        "toaDoLng": {"type": "number", "required": true},
         "macDinh": {"type": "boolean", "required": true},
         "trangThai": {"type": "string", "required": true, "allowedValues": "activeStates"}
       }
@@ -246,6 +246,8 @@
         "diaChiId": {"type": "string", "required": true},
         "loaiRacId": {"type": "string", "required": true},
         "nhanVienHienTaiId": {"type": "string", "required": false},
+        "nhanVienDeXuatId": {"type": "string", "required": false},
+        "offerExpiresAt": {"type": "timestamp", "required": false},
         "phanCongHienTaiId": {"type": "string", "required": false},
         "nhanVienTuChoiIds": {"type": "stringArray", "required": false},
         "soLanDeXuat": {"type": "number", "required": false},

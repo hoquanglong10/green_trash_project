@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/app_models.dart';
+import '../features/orders/domain/staff_dispatch_ranker.dart';
 
 typedef ActivityLogWriter = void Function(ActivityLog log);
 typedef NotificationWriter = void Function(AppNotification notification);
@@ -9,6 +10,7 @@ typedef PaymentRecordWriter = void Function(PaymentRecord payment);
 typedef SubscriptionUsageWriter =
     void Function({required String customerId, required double kg});
 typedef StaffProfilesReader = List<StaffProfile> Function();
+typedef CustomerAddressesReader = List<CustomerAddress> Function();
 typedef StaffStatusWriter = void Function(String staffId, String status);
 
 enum OrderDispatchMode { targetedOffer, openQueue }
@@ -24,6 +26,7 @@ class OrderController extends StateNotifier<List<PickupOrder>> {
     PaymentRecordWriter? savePaymentRecord,
     SubscriptionUsageWriter? consumeSubscription,
     StaffProfilesReader? readStaffProfiles,
+    CustomerAddressesReader? readAddresses,
     StaffStatusWriter? updateStaffStatus,
     this.dispatchMode = OrderDispatchMode.targetedOffer,
   }) : _fallbackStaff = staff,
@@ -34,6 +37,7 @@ class OrderController extends StateNotifier<List<PickupOrder>> {
        _savePaymentRecord = savePaymentRecord,
        _consumeSubscription = consumeSubscription,
        _readStaffProfiles = readStaffProfiles,
+       _readAddresses = readAddresses,
        _updateStaffStatus = updateStaffStatus,
        super(_prepareInitialOrders(initialOrders, dispatchMode));
 
@@ -52,7 +56,12 @@ class OrderController extends StateNotifier<List<PickupOrder>> {
     'DANG_DEN',
   };
 
-  static const _busyStatuses = <String>{'DANG_DEN', 'DA_DEN', 'DANG_CAN_RAC'};
+  static const _busyStatuses = <String>{
+    'DA_NHAN',
+    'DANG_DEN',
+    'DA_DEN',
+    'DANG_CAN_RAC',
+  };
 
   final List<StaffProfile> _fallbackStaff;
   final List<CustomerAddress> _addresses;
@@ -62,6 +71,7 @@ class OrderController extends StateNotifier<List<PickupOrder>> {
   final PaymentRecordWriter? _savePaymentRecord;
   final SubscriptionUsageWriter? _consumeSubscription;
   final StaffProfilesReader? _readStaffProfiles;
+  final CustomerAddressesReader? _readAddresses;
   final StaffStatusWriter? _updateStaffStatus;
   final OrderDispatchMode dispatchMode;
   int _eventSequence = 0;
@@ -599,6 +609,7 @@ class OrderController extends StateNotifier<List<PickupOrder>> {
       gioChot: arrival,
     );
     _replace(updated);
+    _updateStaffStatus?.call(staffId, 'DANG_THU_GOM');
     final arrivalLabel = _formatTime(arrival);
     _log(
       order: updated,
@@ -770,13 +781,7 @@ class OrderController extends StateNotifier<List<PickupOrder>> {
         .toList();
 
     if (availableStaff.isEmpty) return null;
-    availableStaff.sort((a, b) {
-      final aSameArea = _sameArea(address, a) ? 0 : 1;
-      final bSameArea = _sameArea(address, b) ? 0 : 1;
-      final areaCompare = aSameArea.compareTo(bSameArea);
-      if (areaCompare != 0) return areaCompare;
-      return a.doanhThuHienTai.compareTo(b.doanhThuHienTai);
-    });
+    availableStaff.sort((a, b) => compareStaffForPickup(a, b, address));
     return availableStaff.first.nhanVienId;
   }
 
@@ -839,17 +844,10 @@ class OrderController extends StateNotifier<List<PickupOrder>> {
       _readStaffProfiles?.call() ?? _fallbackStaff;
 
   CustomerAddress? _findAddress(String diaChiId) {
-    for (final address in _addresses) {
+    for (final address in _readAddresses?.call() ?? _addresses) {
       if (address.diaChiId == diaChiId) return address;
     }
     return null;
-  }
-
-  bool _sameArea(CustomerAddress? address, StaffProfile staff) {
-    if (address == null) return false;
-    return staff.viTriHienTai.toLowerCase().contains(
-      address.quanHuyen.toLowerCase(),
-    );
   }
 
   bool _isWithinWorkingHours(StaffProfile staff, String timeSlot) {

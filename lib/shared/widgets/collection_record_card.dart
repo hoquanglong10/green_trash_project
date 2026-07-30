@@ -29,17 +29,10 @@ class CollectionRecordCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: const Icon(
-                    Icons.verified_outlined,
-                    color: AppColors.primary,
-                  ),
+                const Icon(
+                  Icons.verified_rounded,
+                  color: AppColors.success,
+                  size: 24,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(

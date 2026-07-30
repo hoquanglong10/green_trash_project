@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/app_models.dart';
-import 'option_icon.dart';
 
 class OrderPreviewCard extends StatelessWidget {
   const OrderPreviewCard({
@@ -32,17 +31,23 @@ class OrderPreviewCard extends StatelessWidget {
     final selectedKg = kg;
     final selectedStaff = staff;
 
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.green50,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.green200),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const OptionIcon(
-                  icon: Icons.receipt_long_outlined,
-                  selected: true,
+                const Icon(
+                  Icons.receipt_long_rounded,
+                  color: AppColors.primary,
+                  size: 22,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(

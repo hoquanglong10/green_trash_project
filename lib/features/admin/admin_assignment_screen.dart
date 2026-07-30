@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../models/app_models.dart';
 import '../../providers/app_providers.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -39,6 +40,7 @@ class _AdminAssignmentScreenState extends ConsumerState<AdminAssignmentScreen> {
     }
 
     return AppPage(
+      maxWidth: 900,
       title: 'Phân công đơn',
       subtitle: 'Điều phối nhân viên thu gom',
       bottomNavigationBar: SafeArea(
@@ -142,52 +144,56 @@ class _SelectableOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
+    return AnimatedContainer(
+      duration: AppMotion.fast,
+      decoration: BoxDecoration(
+        color: selected ? AppColors.green50 : AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(
+        border: Border.all(
           color: selected ? AppColors.primary : AppColors.border,
-          width: selected ? 1.3 : 1,
+          width: selected ? 1.5 : 1,
         ),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: selected ? AppColors.primary : AppColors.muted,
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      order.maDon,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(waste?.tenLoaiRac ?? order.loaiRacId),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      address?.shortAddress ?? order.diaChiId,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                    ),
-                  ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                  color: selected ? AppColors.primary : AppColors.muted,
                 ),
-              ),
-              StatusChip(status: order.trangThai, compact: true),
-            ],
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formatOrderCode(order.maDon),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(waste?.tenLoaiRac ?? order.loaiRacId),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        address?.shortAddress ?? order.diaChiId,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                StatusChip(status: order.trangThai, compact: true),
+              ],
+            ),
           ),
         ),
       ),
@@ -208,28 +214,32 @@ class _SelectableStaffCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
+    return AnimatedContainer(
+      duration: AppMotion.fast,
+      decoration: BoxDecoration(
+        color: selected ? AppColors.green50 : AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(
+        border: Border.all(
           color: selected ? AppColors.primary : AppColors.border,
-          width: selected ? 1.3 : 1,
+          width: selected ? 1.5 : 1,
         ),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        onTap: onTap,
-        child: ListTile(
-          leading: Icon(
-            selected ? Icons.radio_button_checked : Icons.radio_button_off,
-            color: selected ? AppColors.primary : AppColors.muted,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: onTap,
+          child: ListTile(
+            leading: Icon(
+              selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+              color: selected ? AppColors.primary : AppColors.muted,
+            ),
+            title: Text(profile.maNhanVien),
+            subtitle: Text(
+              '${profile.viTriHienTai} • ${profile.gioBatDau}-${profile.gioKetThuc}',
+            ),
+            trailing: const Icon(Icons.badge_outlined),
           ),
-          title: Text(profile.maNhanVien),
-          subtitle: Text(
-            '${profile.viTriHienTai} • ${profile.gioBatDau}-${profile.gioKetThuc}',
-          ),
-          trailing: const Icon(Icons.badge_outlined),
         ),
       ),
     );
