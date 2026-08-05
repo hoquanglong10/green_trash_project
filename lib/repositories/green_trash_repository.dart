@@ -9,6 +9,8 @@ abstract class GreenTrashRepository {
   List<PriceItem> get prices;
   List<PickupPackage> get packages;
   List<PackageSubscription> get subscriptions;
+  List<PaymentRecord> get payments;
+  List<Invoice> get invoices;
   List<PickupOrder> get initialOrders;
   List<ActivityLog> get activityLogs;
   List<AppNotification> get notifications;
@@ -180,6 +182,42 @@ class MockGreenTrashRepository implements GreenTrashRepository {
   ];
 
   @override
+  List<PaymentRecord> get payments => [
+    PaymentRecord(
+      thanhToanId: 'TT_001',
+      maDon: 'DON_001',
+      khachHangId: 'USER_KH_001',
+      soTien: 42500,
+      phuongThuc: 'VI_DIEN_TU',
+      maGiaoDichNgoai: 'MOMO_20260708001',
+      trangThai: 'DA_THANH_TOAN',
+      thoiGian: DateTime(2026, 7, 8, 9, 5),
+    ),
+    PaymentRecord(
+      thanhToanId: 'TT_002',
+      maDon: 'DON_002',
+      khachHangId: 'USER_KH_001',
+      soTien: 15000,
+      phuongThuc: 'TIEN_MAT',
+      trangThai: 'CHO_THANH_TOAN',
+      thoiGian: DateTime(2026, 7, 9, 10),
+    ),
+  ];
+
+  @override
+  List<Invoice> get invoices => [
+    Invoice(
+      hoaDonId: 'HD_001',
+      maDon: 'DON_001',
+      thanhToanId: 'TT_001',
+      soKgThucTe: 8.5,
+      donGia: 5000,
+      tongTien: 42500,
+      thoiGianTao: DateTime(2026, 7, 8, 9, 6),
+    ),
+  ];
+
+  @override
   List<PickupOrder> get initialOrders => [
     PickupOrder(
       maDon: 'DON_001',
@@ -239,9 +277,27 @@ class MockGreenTrashRepository implements GreenTrashRepository {
       nguoiNhanId: 'USER_KH_001',
       maDon: 'DON_001',
       tieuDe: 'Nhân viên đã nhận đơn',
-      noiDung: 'Đơn DON_001 đang được xử lý trong khung 08:00-10:00.',
+      noiDung: 'Đơn DON_001 đang được xử lý trong khung giờ 08:00-10:00.',
       trangThaiDoc: 'CHUA_DOC',
       thoiGian: DateTime(2026, 7, 8, 8, 32),
+    ),
+    AppNotification(
+      thongBaoId: 'TB_002',
+      nguoiNhanId: 'USER_KH_001',
+      maDon: 'DON_002',
+      tieuDe: 'Đơn thu gom đã được tạo',
+      noiDung:
+          'Đơn DON_002 đã được ghi nhận. Hệ thống đang tìm nhân viên phù hợp.',
+      trangThaiDoc: 'CHUA_DOC',
+      thoiGian: DateTime(2026, 7, 8, 9, 15),
+    ),
+    AppNotification(
+      thongBaoId: 'TB_003',
+      nguoiNhanId: 'USER_KH_001',
+      tieuDe: 'Gói tháng còn hiệu lực',
+      noiDung: 'Gói thu gom 126 kg của bạn hiện còn 116,8 kg để sử dụng.',
+      trangThaiDoc: 'DA_DOC',
+      thoiGian: DateTime(2026, 7, 7, 19, 30),
     ),
   ];
 

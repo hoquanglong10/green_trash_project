@@ -9,6 +9,8 @@ import '../../providers/app_providers.dart';
 import '../../shared/widgets/app_widgets.dart';
 import 'booking_screen.dart';
 import 'order_detail_screen.dart';
+import 'customer_feature_menu_screen.dart';
+import 'notification_screen.dart';
 
 class CustomerHomeScreen extends ConsumerWidget {
   const CustomerHomeScreen({super.key});
@@ -39,8 +41,14 @@ class CustomerHomeScreen extends ConsumerWidget {
       appBarTitleColor: HomeTrialColors.white,
       appBarSubtitleColor: AppColors.opacity(HomeTrialColors.white, 0.82),
       leading: IconButton(
-        tooltip: 'Đăng xuất',
-        onPressed: () => ref.read(currentSessionProvider.notifier).state = null,
+        tooltip: 'Tiện ích khách hàng',
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (context) => const CustomerFeatureMenuScreen(),
+            ),
+          );
+        },
         icon: const Icon(Icons.menu_rounded, size: 32),
       ),
       actions: [
@@ -48,8 +56,35 @@ class CustomerHomeScreen extends ConsumerWidget {
           width: kToolbarHeight,
           child: IconButton(
             tooltip: 'Thông báo',
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none_outlined, size: 32),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const NotificationScreen(),
+                ),
+              );
+            },
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_none_outlined, size: 32),
+                if (notifications.any(
+                  (notification) => notification.trangThaiDoc == 'CHUA_DOC',
+                ))
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: AppColors.amber,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.white, width: 2),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ],
