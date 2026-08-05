@@ -14,6 +14,7 @@ import '../notifications/presentation/widgets/notification_bell.dart';
 import '../orders/presentation/order_history_screen.dart';
 import 'address_book/presentation/address_book_screen.dart';
 import 'booking_screen.dart';
+import 'customer_feature_menu_screen.dart';
 import 'order_detail_screen.dart';
 
 class CustomerHomeScreen extends ConsumerWidget {
@@ -69,10 +70,19 @@ class CustomerHomeScreen extends ConsumerWidget {
       ).push(MaterialPageRoute(builder: (_) => const AddressBookScreen()));
     }
 
+    void openCustomerFeatures() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const CustomerFeatureMenuScreen(),
+        ),
+      );
+    }
+
     return DashboardShell(
       maxContentWidth: 1120,
       drawer: _CustomerDrawer(
         user: user,
+        onCustomerFeatures: openCustomerFeatures,
         onAddressBook: openAddressBook,
         onLogout: () async {
           await ref.read(firebaseAuthenticationServiceProvider).signOut();
@@ -1004,11 +1014,13 @@ class _CompactFact extends StatelessWidget {
 class _CustomerDrawer extends StatelessWidget {
   const _CustomerDrawer({
     required this.user,
+    required this.onCustomerFeatures,
     required this.onAddressBook,
     required this.onLogout,
   });
 
   final AppUser user;
+  final VoidCallback onCustomerFeatures;
   final VoidCallback onAddressBook;
   final VoidCallback onLogout;
 
@@ -1056,7 +1068,10 @@ class _CustomerDrawer extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.person_outline_rounded),
               title: const Text('Tài khoản'),
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).pop();
+                onCustomerFeatures();
+              },
             ),
             ListTile(
               leading: const Icon(Icons.location_on_outlined),
