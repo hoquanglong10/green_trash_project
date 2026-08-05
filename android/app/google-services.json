@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "898442906799",
-    "project_id": "greentrashdb",
-    "storage_bucket": "greentrashdb.firebasestorage.app"
+    "project_number": "253907087385",
+    "project_id": "greentrash-xuanthao",
+    "storage_bucket": "greentrash-xuanthao.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:898442906799:android:1cb05641af98ef910d185a",
+        "mobilesdk_app_id": "1:253907087385:android:b249f34c203ee06ca03a88",
         "android_client_info": {
           "package_name": "com.example.green_trash_project"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBvf9y_R2lddCvgd_H6i7mxF54OEeOD_04"
+          "current_key": "AIzaSyCIiXUiZ1i5RYTwdbvNwy292D7Za4U2O00"
         }
       ],
       "services": {

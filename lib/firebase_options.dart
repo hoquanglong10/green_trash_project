@@ -44,23 +44,22 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyA2XiDEXY6w6grnVZKyLN84Dxzr9XcnAt0',
-    appId: '1:898442906799:web:b20cc4fe4e7d01150d185a',
-    messagingSenderId: '898442906799',
-    projectId: 'greentrashdb',
-    authDomain: 'greentrashdb.firebaseapp.com',
-    storageBucket: 'greentrashdb.firebasestorage.app',
-    measurementId: 'G-LBT28VCN78',
+    apiKey: 'AIzaSyAmitR2tSIsnQYsWF0Sw9lmKNR8oRczpyc',
+    appId: '1:253907087385:web:142c5061d47901d0a03a88',
+    messagingSenderId: '253907087385',
+    projectId: 'greentrash-xuanthao',
+    authDomain: 'greentrash-xuanthao.firebaseapp.com',
+    storageBucket: 'greentrash-xuanthao.firebasestorage.app',
+    measurementId: 'G-KSCMFZ9DDJ',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBvf9y_R2lddCvgd_H6i7mxF54OEeOD_04',
-    appId: '1:898442906799:android:1cb05641af98ef910d185a',
-    messagingSenderId: '898442906799',
-    projectId: 'greentrashdb',
-    storageBucket: 'greentrashdb.firebasestorage.app',
+    apiKey: 'AIzaSyCIiXUiZ1i5RYTwdbvNwy292D7Za4U2O00',
+    appId: '1:253907087385:android:b249f34c203ee06ca03a88',
+    messagingSenderId: '253907087385',
+    projectId: 'greentrash-xuanthao',
+    storageBucket: 'greentrash-xuanthao.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyD2x4LvIyu_HXcm71SuxUqxrPhZmn2lrUg',
     appId: '1:898442906799:ios:d5dab003049f0fcf0d185a',

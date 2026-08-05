@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "greentrashdb"
-  }
+    "default": "greentrash-xuanthao"
+  },
+  "targets": {},
+  "etags": {}
 }
