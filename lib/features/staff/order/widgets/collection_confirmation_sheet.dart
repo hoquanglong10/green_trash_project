@@ -639,23 +639,26 @@ class _PaymentConfirmation extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: confirmed,
-            onChanged: onConfirmedChanged,
-            title: Text(
-              confirmationLabel,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text(
-              confirmed
-                  ? 'Thanh toán sẽ được ghi nhận đã hoàn tất.'
-                  : 'Có thể hoàn thành đơn và để khách thanh toán sau.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+          Material(
+            color: Colors.transparent,
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: confirmed,
+              onChanged: onConfirmedChanged,
+              title: Text(
+                confirmationLabel,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                confirmed
+                    ? 'Thanh toán sẽ được ghi nhận đã hoàn tất.'
+                    : 'Có thể hoàn thành đơn và để khách thanh toán sau.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+              ),
             ),
           ),
         ],
