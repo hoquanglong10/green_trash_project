@@ -44,15 +44,67 @@ class StaffHomeScreen extends ConsumerWidget {
       );
     }
 
+    Future<void> handleLogout() async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            icon: const Icon(
+              Icons.logout_rounded,
+              size: 36,
+              color: AppColors.warning,
+            ),
+            title: const Text('Xác nhận đăng xuất'),
+            content: const Text(
+              'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản nhân viên không?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(false);
+                },
+                child: const Text('Hủy'),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(true);
+                },
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Đăng xuất'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (confirmed != true || !context.mounted) {
+        return;
+      }
+
+      try {
+        await ref.read(firebaseAuthenticationServiceProvider).signOut();
+
+        ref.read(currentSessionProvider.notifier).state = null;
+      } catch (error) {
+        if (!context.mounted) {
+          return;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể đăng xuất: $error'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+
     return DashboardShell(
       maxContentWidth: 1160,
       drawer: _StaffDrawer(
         user: user,
         profile: profile,
-        onLogout: () async {
-          await ref.read(firebaseAuthenticationServiceProvider).signOut();
-          ref.read(currentSessionProvider.notifier).state = null;
-        },
+        onLogout: handleLogout,
       ),
       destinations: [
         DashboardDestination(
@@ -74,7 +126,15 @@ class StaffHomeScreen extends ConsumerWidget {
           onPressed: openHistory,
           icon: const Icon(Icons.history_rounded),
         ),
-        const SizedBox(width: AppSpacing.sm),
+        const SizedBox(width: AppSpacing.xs),
+        Padding(
+          padding: const EdgeInsets.only(right: AppSpacing.sm),
+          child: TextButton.icon(
+            onPressed: handleLogout,
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Đăng xuất'),
+          ),
+        ),
       ],
       child: LayoutBuilder(
         builder: (context, constraints) {

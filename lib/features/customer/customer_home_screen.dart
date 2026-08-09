@@ -16,6 +16,7 @@ import 'address_book/presentation/address_book_screen.dart';
 import 'booking_screen.dart';
 import 'customer_feature_menu_screen.dart';
 import 'order_detail_screen.dart';
+import 'secondary/application/customer_secondary_providers.dart';
 
 class CustomerHomeScreen extends ConsumerWidget {
   const CustomerHomeScreen({super.key});
@@ -34,9 +35,11 @@ class CustomerHomeScreen extends ConsumerWidget {
     final wastes = ref.watch(wasteTypesProvider);
     final staff = ref.watch(staffProfilesProvider);
     final notifications = ref.watch(notificationsProvider);
-    final subscription = ref.watch(currentSubscriptionProvider);
+    final subscription = ref.watch(
+      customerSecondaryCurrentSubscriptionProvider,
+    );
     final packages = ref.watch(packagesProvider);
-    final package = packages.isEmpty ? null : packages.first;
+    final package = _findPackageForSubscription(packages, subscription);
     final activeOrder = _findActiveOrder(orders);
     final recentOrders = orders
         .where((order) => order.maDon != activeOrder?.maDon)
@@ -113,6 +116,12 @@ class CustomerHomeScreen extends ConsumerWidget {
           selectedIcon: Icons.location_on_rounded,
           label: 'Địa chỉ',
           onSelected: openAddressBook,
+        ),
+        DashboardDestination(
+          icon: Icons.apps_outlined,
+          selectedIcon: Icons.apps_rounded,
+          label: 'Tiện ích',
+          onSelected: openCustomerFeatures,
         ),
       ],
       actions: [
@@ -250,6 +259,26 @@ class CustomerHomeScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  static PickupPackage? _findPackageForSubscription(
+    List<PickupPackage> packages,
+    PackageSubscription? subscription,
+  ) {
+    if (packages.isEmpty) {
+      return null;
+    }
+
+    if (subscription == null) {
+      return packages.first;
+    }
+
+    for (final package in packages) {
+      if (package.goiId == subscription.goiId) {
+        return package;
+      }
+    }
+    return packages.first;
   }
 }
 
@@ -740,11 +769,28 @@ class _PackageModule extends StatelessWidget {
       );
     }
 
-    final used = subscription?.soKgDaDung ?? 0;
-    final remaining = subscription?.soKgConLai ?? currentPackage.hanMucKgThang;
-    final total = used + remaining;
-    final progress = total == 0 ? 0.0 : (used / total).clamp(0.0, 1.0);
+    final currentSubscription = subscription;
+    final limit = currentPackage.hanMucKgThang.toDouble();
 
+    final used = (currentSubscription?.soKgDaDung ?? 0)
+        .toDouble()
+        .clamp(0.0, limit)
+        .toDouble();
+
+    final remaining = currentSubscription == null
+        ? limit
+        : currentSubscription.soKgConLai
+              .toDouble()
+              .clamp(0.0, limit)
+              .toDouble();
+
+    final progress = limit <= 0
+        ? 0.0
+        : (used / limit).clamp(0.0, 1.0).toDouble();
+
+    final status = currentSubscription?.trangThai;
+
+    final isActive = status == 'CON_HL' || status == 'CON_HIEU_LUC';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -780,12 +826,10 @@ class _PackageModule extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.xxs),
                           Text(
-                            subscription?.trangThai == 'CON_HL'
-                                ? 'Đang có hiệu lực'
-                                : 'Cần gia hạn',
+                            isActive ? 'Đang có hiệu lực' : 'Cần gia hạn',
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
-                                  color: subscription?.trangThai == 'CON_HL'
+                                  color: isActive
                                       ? AppColors.success
                                       : AppColors.warning,
                                 ),
